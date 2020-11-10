@@ -1,5 +1,5 @@
 import numpy as np
-import matlab.engine
+
 
 def gridworldbuild(mdp_params):
 #Construct the Gridworld MDP structures. 
@@ -44,17 +44,9 @@ def gridworldbuild(mdp_params):
     #Fill in the reward function.
     R_SCALE = 100
     r = np.zeros((mdp_params['n']**2,5))
-    for yc in range(mdp_params['n']/mdp_params['b']):
-        for xc in range(mdp_params['n']/mdp_params['b']):
+    for yc in range(int(mdp_params['n']/mdp_params['b'])):
+        for xc in range(int(mdp_params['n']/mdp_params['b'])):
             #Select a reward for macro-cell
-           
-            """
-            #External matlab script for rand to stay consistent with real matlab implementation
-            eng = matlab.engine.start_matlab()
-            macro_reward = eng.randomRgenerator()
-            macro_reward *= R_SCALE
-            """
-
             macro_reward = (np.random.rand(1,1)**8)*R_SCALE
 
             #Assign reward to all state-action pairs in macro-cell.

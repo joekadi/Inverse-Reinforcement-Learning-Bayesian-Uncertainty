@@ -15,9 +15,6 @@ T = 8
 #generate mdp and R
 mdp_data, r = gridworldbuild(mdp_params)
 
-
-
-
 #set R equal matlab random seed 0
 r = np.array([[0.0005  ,  0.0005  ,  0.0005  ,  0.0005  ,  0.0005],
                 [0.0000   , 0.0000   , 0.0000   , 0.0000   , 0.0000],
