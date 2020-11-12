@@ -3,7 +3,7 @@ torch.set_printoptions(precision=5)
 
 def gridworldbuild(mdp_params):
 #Construct the Gridworld MDP structures. 
-    torch.random.seed()
+    torch.manual_seed(mdp_params['seed'])
     #Build action mappings
     sa_s = torch.zeros((mdp_params['n']**2,5,5), dtype=torch.int8)
     sa_p = torch.zeros((mdp_params['n']**2,5,5), dtype=torch.int8)

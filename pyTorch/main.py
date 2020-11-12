@@ -56,7 +56,7 @@ foundR = torch.reshape(torch.tensor(res.x), (4,1))
 foundR = foundR.repeat(1, 5)
 print(foundR.dtype
 	)
-foundLH = lh.negated_likelihood(foundR)
+foundLH, founddr = lh.negated_likelihood(foundR)
 
 #solve MDP with foundR for optimal policy
 v, q, logp, foundp = linearvalueiteration(mdp_data, foundR)
@@ -64,13 +64,13 @@ found_optimal_policy = np.argmax(foundp.detach().cpu().numpy(), axis=1)
 
 
 #Print true R stats
-trueLH = lh.negated_likelihood(r)
-trueRprintlist = [r, trueLH, optimal_policy, truep]
-print("\nTrue R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n derived from policy \n{}".format(*trueRprintlist))
+trueLH, trueDR = lh.negated_likelihood(r)
+trueRprintlist = [r, trueLH, optimal_policy]
+print("\nTrue R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(*trueRprintlist))
 
 #Print found R stats
-foundRprintlist = [foundR, foundLH, found_optimal_policy, foundp]
-print("\nFound R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n derived from policy \n{}".format(*foundRprintlist))
+foundRprintlist = [foundR, foundLH, found_optimal_policy]
+print("\nFound R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(*foundRprintlist))
 
 
 

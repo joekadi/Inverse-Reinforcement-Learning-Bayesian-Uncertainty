@@ -21,7 +21,7 @@ class Likelihood:
         self.example_samples = example_samples
         self.transitions = len(mdp_data['sa_p'][0][0])
 
-        """
+        '''
         #Compute feature expectations.
         self.F = torch.eye(self.mdp_data['states'], dtype=torch.float64)
         features = self.F.shape[2-1]
@@ -62,9 +62,10 @@ class Likelihood:
                 for k in range(self.transitions):
                     sp = self.mdp_data['sa_s'][s,a,k]
                     self.initD[sp] = self.initD[sp] - self.mdp_data['discount']*self.mdp_data['sa_p'][s,a,k]
-        """
+        '''
         
     def negated_likelihood(self, r):
+        
         
         #set mu_sa & initD = matlab to test with same sampled paths
         #for normal run keep below code commented
