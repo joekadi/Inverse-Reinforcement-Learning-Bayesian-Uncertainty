@@ -1,5 +1,5 @@
-import numpy as np
 import torch
+torch.set_printoptions(precision=5)
 
 def gridworldbuild(mdp_params):
 #Construct the Gridworld MDP structures. 
@@ -18,17 +18,6 @@ def gridworldbuild(mdp_params):
             successors[0,0,2] = ((y)*mdp_params['n']+min(mdp_params['n'],x+2))-1
             successors[0,0,3] = ((max(1,y)-1)*mdp_params['n']+x+1)-1
             successors[0,0,4] = ((y)*mdp_params['n']+max(1,x))-1  
-
-            #for debugging tile
-            """
-            print('Successors {}'.format(successors))
-            print('Successors shape: {}'.format(successors.shape))
-            print('Successors tile shape{}'.format(np.tile(successors, [1,5,1]).shape))
-            print('Successors tile\n{}'.format(np.tile(successors, [1,5,1])))
-            print('Successors(:,:,1): {}'.format(successors[:,:,1]))
-            """
-
-
             sa_s[s,:,:] = successors.repeat([1,5,1])
             sa_p[s,:,:] = torch.reshape(torch.eye(5,5)*mdp_params['determinism'] + (torch.ones((5,5)) - torch.eye(5,5)) * ((1.0-mdp_params['determinism'])/4.0), (1,5,5))
 
@@ -43,12 +32,11 @@ def gridworldbuild(mdp_params):
 
     #Fill in the reward function.
     R_SCALE = 100
-    r = torch.zeros((mdp_params['n']**2,5))
+    r = torch.zeros((mdp_params['n']**2,5), dtype=torch.float64)
     for yc in range(int(mdp_params['n']/mdp_params['b'])):
         for xc in range(int(mdp_params['n']/mdp_params['b'])):
             #Select a reward for macro-cell
             macro_reward = (torch.randn(1,1)**8)*R_SCALE
-
             #Assign reward to all state-action pairs in macro-cell.
             ys = yc*mdp_params['b']
             ye = yc*mdp_params['b']+1
