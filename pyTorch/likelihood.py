@@ -3,6 +3,7 @@ import scipy.sparse as sps
 from linervalueiteration import *
 from linearmdpfrequency import *
 import torch
+from torch.autograd import Variable
 torch.set_printoptions(precision=3)
 
 class Likelihood:
@@ -20,6 +21,31 @@ class Likelihood:
         self.T = T
         self.example_samples = example_samples
         self.transitions = len(mdp_data['sa_p'][0][0])
+        
+        #set mu_sa & initD = matlab to test with same sampled paths
+        #for normal run keep below code commented
+        
+        self.mu_sa = torch.tensor([[1  , 260   ,  1  ,   0   ,  0],
+                        [1  , 253  ,   0   ,  1   ,  0],
+                        [906 ,  843  , 931   ,  2  , 928],
+                       [991  , 968  , 972  ,   3 ,  939]], dtype=torch.float64)
+
+        self.muE = torch.tensor([[262.],
+                        [255.],
+                        [3610.],
+                        [3873.]], dtype=torch.float64)
+
+        self.initD = torch.tensor([[259.0300],
+                                [249.0600],
+                                [-227.2400],
+                                [-200.8500]], dtype=torch.float64)
+
+        self.F = torch.tensor([ [1,0,0,0],
+                            [0,1,0,0],
+                            [0,0,1,0],
+                            [0,0,0,1]], dtype=torch.float64)
+        
+        
 
         '''
         #Compute feature expectations.
@@ -40,6 +66,7 @@ class Likelihood:
                 self.mu_sa[int(ex_s[i,t]),int(ex_a[i,t])] = self.mu_sa[int(ex_s[i,t]),int(ex_a[i,t])] + 1.0 #maybe minus 1 since numpy index -1 to matlab
                 state_vec = torch.zeros((self.mdp_data['states'],1), dtype=torch.float64)
                 state_vec[int(ex_s[i,t])] = 1.0
+
                 self.muE = self.muE + torch.matmul(torch.t(self.F),state_vec)
                             
         #initlaise params to construct sparse matrix
@@ -62,63 +89,65 @@ class Likelihood:
                 for k in range(self.transitions):
                     sp = self.mdp_data['sa_s'][s,a,k]
                     self.initD[sp] = self.initD[sp] - self.mdp_data['discount']*self.mdp_data['sa_p'][s,a,k]
-        '''
         
+        
+        print('mu_sa \n{}\n'.format(self.mu_sa))
+        print('muE \n{}\n'.format(self.muE))
+        print('initD \n{}\n'.format(self.initD))
+        print('F \n{}\n'.format(self.F))
+        '''
+
+
     def negated_likelihood(self, r):
         
         
-        #set mu_sa & initD = matlab to test with same sampled paths
-        #for normal run keep below code commented
-        
-        self.mu_sa = torch.tensor([[1  , 260   ,  1  ,   0   ,  0],
-                        [1  , 253  ,   0   ,  1   ,  0],
-                        [906 ,  843  , 931   ,  2  , 928],
-                       [991  , 968  , 972  ,   3 ,  939]], dtype=torch.float64)
-
-        self.muE = torch.tensor([[262.],
-                        [255.],
-                        [3610.],
-                        [3873.]], dtype=torch.float64)
-
-        self.initD = torch.tensor([259.0300, 249.0600, -227.2400,-200.8500], dtype=torch.float64)
-
-        self.F = torch.tensor([ [1,0,0,0],
-                            [0,1,0,0],
-                            [0,0,1,0],
-                            [0,0,0,1]], dtype=torch.float64)
-        
-        
-
-
+        #Reformat R
         if(torch.is_tensor(r) == False):
+
             r = torch.tensor(r)
             
-        #Reshape R to expected
-        if(r.shape != (4,5)):
-            r = torch.reshape(r, (4,1))
+        if(r.shape != (self.mdp_data['states'],5)):
+            #print('Reward in reshape \n{}'.format(r))
+
+            r = torch.reshape(r, (self.mdp_data['states'],1))
             r = r.repeat((1, 5))
             
-        self.initD = torch.reshape(self.initD, (4,1))
+        self.initD = torch.reshape(self.initD, (self.mdp_data['states'],1))
         #Solve MDP with current reward
         v, q, logp, p = linearvalueiteration(self.mdp_data, r)
 
         #Calculate likelihood from logp
         likelihood = sum(sum(logp*self.mu_sa))
-        likelihood = likelihood.item() #get scalar value
 
+        #dr = dr.detach().cpu().numpy() #convert to array
+        #dr = dr.reshape(len(dr),1)#column vector
+        #print("Gradient \n{}".format(dr))
+        #dr = dr.astype(np.float64)
         
+        #return negative log likelihood
+        #print('Likelihood \n{}\n belonging to reward \n{}'.format(-likelihood, r))
+        return -likelihood
+
+    def calc_gradient(self, r):
+
+       #Reformat R
+        if(torch.is_tensor(r) == False):
+            r = torch.tensor(r)
+            
+        if(r.shape != (self.mdp_data['states'],5)):
+            r = torch.reshape(r, (self.mdp_data['states'],1))
+            r = r.repeat((1, 5))
+
+        #Solve MDP with current reward
+        v, q, logp, p = linearvalueiteration(self.mdp_data, r)
         #Compute state visitation count D
         D = linearmdpfrequency(self.mdp_data,p.detach().cpu().numpy(),self.initD.detach().cpu().numpy())
         D = torch.tensor(D)
-        #print(D.dtype)
 
         #Compute gradient.
         dr = self.muE - torch.matmul(torch.t(self.F),D)
-        dr = -dr #Invert for descent.
-        dr = dr.detach().cpu().numpy() #convert to array
-        #dr = dr.reshape(len(dr),1)#column vector
-        print("Gradient \n{}".format(dr))
-        #dr = dr.astype(np.float64)
-        
-        return -(likelihood), dr
+       
+        #return -dr for descent
+        #print('Gradient \n{}'.format(-dr))
 
+        return -dr

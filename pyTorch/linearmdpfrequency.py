@@ -40,14 +40,17 @@ def linearmdpfrequency(mdp_data,p,initD):
     while(diff >= threshold):
         Dp = np.array(D, dtype=np.float64)
         LHS = np.multiply(np.tile(p[...,None], (1,1,transitions)), mdp_data['sa_p'].detach().cpu().numpy())
+        #print('LHS \n {}'.format(LHS))
         RHS0 = np.tile(Dp[...,None], (1,actions,transitions))
+        #print('RHS0 \n {}'.format(RHS0))
         RHS = RHS0*mdp_data['discount']
+
         Dpi = np.multiply(LHS, RHS)
         D_CSR = sps.csc_matrix((Dpi.flatten(1), mdp_data['sa_s'].detach().cpu().numpy().flatten(1),np.arange(states*actions*transitions+1)), shape=(states,states*actions*transitions)) 
         D_CSR.eliminate_zeros()
         D_mx = np.matmul(D_CSR.todense(),np.ones((states*actions*transitions,1)))
         D_s = np.sum(D_mx,1)
         D = initD + D_s
-        diff = max(abs(D-Dp))
+        diff = np.max(np.abs(np.subtract(D,Dp)))
 
     return D

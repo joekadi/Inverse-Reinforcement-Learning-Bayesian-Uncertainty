@@ -1,10 +1,13 @@
 import torch
+import numpy as np
 torch.set_printoptions(precision=5)
 
 def gridworldbuild(mdp_params):
 #Construct the Gridworld MDP structures. 
     torch.manual_seed(mdp_params['seed'])
+    np.random.seed(seed=mdp_params['seed'])
     #Build action mappings
+
     sa_s = torch.zeros((mdp_params['n']**2,5,5), dtype=torch.int8)
     sa_p = torch.zeros((mdp_params['n']**2,5,5), dtype=torch.int8)
     for y in range(mdp_params['n']):
@@ -36,7 +39,8 @@ def gridworldbuild(mdp_params):
     for yc in range(int(mdp_params['n']/mdp_params['b'])):
         for xc in range(int(mdp_params['n']/mdp_params['b'])):
             #Select a reward for macro-cell
-            macro_reward = (torch.randn(1,1)**8)*R_SCALE
+            macro_reward0= (np.random.rand(1,1)**8)*R_SCALE
+            macro_reward = torch.tensor(macro_reward0)
             #Assign reward to all state-action pairs in macro-cell.
             ys = yc*mdp_params['b']
             ye = yc*mdp_params['b']+1

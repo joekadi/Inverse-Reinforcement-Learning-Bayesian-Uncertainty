@@ -19,7 +19,7 @@ def linearvalueiteration(mdp_data, r):
     sa_s = sa_s.type(torch.float64)
     diff = 1.0
     count = 0
-    while diff >= 0.0001:
+    while diff >= 0.00001:
         count +=1 
         vp = copy.copy(v)
 
@@ -27,17 +27,6 @@ def linearvalueiteration(mdp_data, r):
        
         for i in range(len(vp)): 
             sa_s[mdp_data['sa_s'] == i] = vp[i] #vp(mdp_data.sa_s)
-
-        """
-        print("sa_s post transform")
-        print('\nsa_s(:,:,0)\n\n{}'.format(sa_s[:,:,0]))
-        print('\nsa_s(:,:,1)\n{}'.format(sa_s[:,:,1]))
-        print('\nsa_s(:,:,2)\n{}'.format(sa_s[:,:,2]))
-        print('\nsa_s(:,:,3)\n{}'.format(sa_s[:,:,3]))
-        print('\nsa_s(:,:,4)\n{}'.format(sa_s[:,:,4]))
-        """
-    
-
 
         q = r + mdp_data['discount']* torch.sum(mdp_data['sa_p']*sa_s, 2)
         v = maxentsoftmax(q)
