@@ -33,7 +33,7 @@ def linearmdpfrequency(mdp_data,p,initD):
     [states,actions,transitions] = mdp_data['sa_p'].detach().cpu().numpy().shape
     D = np.zeros((states,1))
     diff = 1.0
-    threshold = 0.001
+    threshold = 0.00001
 
     while(diff >= threshold):
         Dp = np.array(D, dtype=np.float64)
