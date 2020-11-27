@@ -1,10 +1,11 @@
 # MSci-Project
 MaxEnt Inverse reinforcement learning model
-Done
+# Done
 - Linear model numPy
 - Linear model pyTorch
 - Linear Neural Network
-ToDo
+
+# ToDo
 - Linear GP
 - Non-Linear Neural Network
 - Non-Linear GP
