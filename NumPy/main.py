@@ -43,19 +43,20 @@ print("\n... Paths sampled with true R ... \n")
 lh = Likelihood()
 lh.set_variables_for_likehood(mdp_data, N, T, example_samples)
 
+'''
 print("... checking gradient ...\n")
 checkR = np.random.randn(mdp_params['n']**2,1) #initial estimated R
 mse = check_grad(lh.negated_likelihood, lh.calc_gradient, [checkR])
 print(mse)
-
-
-
 '''
+
+
+
 #minimsing likelihood for true R
 bnds = [(0,10), (0,10), (0,10), (0,10)]
 guess = np.random.randn(mdp_params['n']**2,1)
 print("... minimising likelihood for R ...")
-res = minimize(lh.negated_likelihood, guess, jac=True, method="L-BFGS-B", options={"disp": True})
+res = minimize(lh.negated_likelihood_with_gradient, guess, jac=True, method="L-BFGS-B", options={"disp": True})
 
 #reshape & find likelihood
 foundR = np.reshape(res.x, (4,1))
@@ -79,7 +80,7 @@ print("\nTrue R is \n{}\n with negated likelihood of {}\n and optimal policy {}"
 print("\nFound R is \n{}\n with negated likelihood of {}\n and optimal policy {}".format(*foundRprintlist))
 
 
-'''
+
 
 #uncomment all prints above to debug
 
@@ -120,29 +121,3 @@ doubledRprintlist = [doubledR, trueLH,optimal_policy]
 print("\nQuadrupled R is \n{}\n with negated likelihood of {}\n and optimal policy {}".format(*doubledRprintlist))
 
 """
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -5,11 +5,15 @@ from sampleexamples import *
 import numpy as np
 np.set_printoptions(suppress=True) 
 from likelihood import *
+from myNLL import *
 from scipy.optimize import minimize, check_grad
 import torch
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
+from linearnn import *
+import torch.nn.functional as F
 torch.set_printoptions(precision=3)
+torch.set_default_tensor_type(torch.DoubleTensor) #default type to torch.float64
 
 class testers:
 	def checkgradients(lh, mdp_params, k):
@@ -68,15 +72,74 @@ class testers:
 		print('Elementwise diff torch gradient - matlab gradient is \n {}'.format(np.subtract(torchG.detach().cpu().numpy(),matlabG)))
 		print('Likelihood diff is {}'.format(torchL - matlabL))
 
-class minimisers:
-	def minimise_likelihood_with_torch(self, lh, type_optim):
+class minimise:
+
+	def linearNN(self, evdThreshold):
+		NLL = myNLL() 
+		NLL.calc_var_values(mdp_data, N, T, example_samples) #set req variables
+		net = LinearNet() 
+		X = torch.Tensor([[0],
+						  [1],
+						  [2],
+						  [3]]) #initalise state features
+		evd = 10 
+		lr = 0.25
+		finaloutput = None
+		#lists for printing
+		NLList = []
+		iterations = []
+		evdList = []
+		optimizer = torch.optim.Adam(net.parameters(), lr=lr) #inital optimiser
+		i = 0
+
+		while(evd > evdThreshold):
+			net.zero_grad()
+			output = net(X.view(-1,4))
+			evd = NLL.calculate_EVD(truep, torch.transpose(output, 0, 1).repeat(1,5))
+			loss = NLL.NLL(output)
+			print('EstR: {} | loss: {} | EVD: {}'.format(output, loss, NLL.calculate_EVD(r, torch.transpose(output, 0, 1).repeat(1,5))))
+			#loss.backward(NLL.gradient(output).repeat(1,4)) 
+			net.fc1.weight.grad = NLL.gradient(output).repeat(1,4)
+			optimizer.step()
+			#store
+			NLList.append(loss)
+			iterations.append(i)
+			evdList.append(evd)
+			finaloutput = output
+			i += 1
+
+
+		'''
+
+		optimizer = torch.optim.LBFGS(net.parameters(), lr=lr)
+		def closure():
+		net.zero_grad()
+		output = net(X.view(-1,4))
+		loss = NLL.NLL(output)
+		net.fc1.weight.grad = NLL.gradient(output).repeat(1,4)
+		print('EstR of {} with loss {}'.format(output, loss))
+		lhList.append(loss)
+		iterations.append(i)
+		return loss
+		for i in range(500):
+		optimizer.step(closure)
+		'''
+
+
+		plt.plot(iterations, NLLList)
+		plt.show()
+		print('\nTrue R: {}'.format(r[:,0]))
+		print('\nFinal Estimated R after 500 optim steps: {}'.format(finaloutput))
+
+	def torchbasic(self, lh, type_optim):
 		
 		#Initalise params
-		estR = torch.randn(mdp_params['n']**2,1, dtype=torch.float64, requires_grad=True) #initial estimated R
+		
 		countlist = []
 		NLLlist = []
 		gradList = []
 		estRlist = []
+		evdList = []
 		lr = 1
 		n_epochs = 1000
 		NLL = 0
@@ -84,6 +147,7 @@ class minimisers:
 		diff = 1
 		threshhold =  0.1
 		i = 0
+		estR = torch.randn(mdp_data['states'],1, dtype=torch.float64, requires_grad=True) #initial estimated R)
 		if(type_optim == 'LBFGS'):
 			optimizer = torch.optim.LBFGS([estR], lr=lr, max_iter=20, max_eval=None, tolerance_grad=1e-07, tolerance_change=1e-09, history_size=100, line_search_fn=None)
 			def closure():
@@ -101,10 +165,13 @@ class minimisers:
 				diff = abs(prev-NLL)
 				print('Optimiser iteration {} with NLL {}, estR values of \n{} and gradient of \n{} and abs diff of {}\n'.format(i, NLL, estR.data, estR.grad, diff))
 				#store values for plotting
+				evd = lh.calculate_EVD(truep)
+				evdList.append(evd)
 				gradList.append(torch.sum(estR.grad))
 				NLLlist.append(NLL)
 				countlist.append(i)
 				estRlist.append(torch.sum(estR.data))
+
 		else:
 			optimizer = torch.optim.Adam([estR], lr=lr)
 			print("... minimising likelihood with Adam...\n")
@@ -116,8 +183,9 @@ class minimisers:
 				estR.grad = lh.calc_gradient(estR)
 				optimizer.step()
 				diff = abs(prev-NLL)
-
 				print('Optimiser iteration {} with NLL {}, estR values of \n{} and gradient of \n{} and abs diff of {}\n'.format(i, NLL, estR.data, estR.grad, diff))				#store values for plotting
+				evd = lh.calculate_EVD(truep)
+				evdList.append(evd)
 				gradList.append(torch.sum(estR.grad))
 				NLLlist.append(NLL)
 				countlist.append(i)
@@ -129,13 +197,19 @@ class minimisers:
 		estRlist = [float(i)/sum(estRlist) for i in estRlist]
 
 		#plot
-		f, (ax1, ax2, ax3) = plt.subplots(1, 3, sharex=True)
+		f, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, sharex=True)
 		ax1.plot(countlist, NLLlist)
 		ax1.set_title('Likelihood')
+		#ax1.xlabel('Iterations')
 		ax2.plot(countlist, gradList)
 		ax2.set_title('grad')
+		#ax2.xlabel('Iterations')
 		ax3.plot(countlist, estRlist)
 		ax3.set_title('estR')
+		#ax3.xlabel('Iterations')
+		ax4.plot(countlist, evdList)
+		ax4.set_title('Expected Value Diff')
+		#ax4.xlabel('Iterations')
 		plt.show()
 
 
@@ -150,11 +224,11 @@ class minimisers:
 		found_optimal_policy = np.argmax(foundp.detach().cpu().numpy(), axis=1) 
 
 		#print
-		print("\nTrue R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(*trueRprintlist))
+		print("\nTrue R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(r, trueNLL, optimal_policy))
 		foundRprintlist = [foundR, foundLH, found_optimal_policy]
 		print("\nFound R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(*foundRprintlist))
 
-	def minimise_likelihood_with_scipy(self, lh):
+	def scipy(self, lh):
 
 		estR = np.random.randn(mdp_params['n']**2,1) #initial estimated R
 		res = minimize(lh.negated_likelihood_with_grad, estR, jac=True, method="L-BFGS-B", options={'disp': True, 'gtol': 1e-05, 'eps': 1e-08, 'maxiter': 15000, 'ftol': 2.220446049250313e-09, 'maxcor': 10, 'maxfun': 15000})
@@ -175,6 +249,8 @@ class minimisers:
 		foundRprintlist = [foundR, foundLH, found_optimal_policy]
 		print("\nFound R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(*foundRprintlist))
 
+	
+
 
 #set mdp params
 mdp_params = {'n':2, 'b':1, 'determinism':1.0, 'discount':0.99, 'seed': 0}
@@ -184,10 +260,8 @@ T = 8
 print("\n... generating MDP and intial R ... \n")
 #generate mdp and R
 mdp_data, r = gridworldbuild(mdp_params)
-print("\n... done ... \n")
+print("... done ... \n")
 
-
-'''
 #set true R equal matlab impl w/ random seed 0
 #not a reward func ... a look up table
 r = torch.Tensor(np.array(
@@ -197,7 +271,7 @@ r = torch.Tensor(np.array(
 	    [4.5109  ,  4.5109  ,  4.5109  ,  4.5109   , 4.5109],
 	    [4.5339  ,  4.5339  ,  4.5339 ,   4.5339 ,   4.5339]
 	 ], dtype=np.float64))
-'''
+
 
 #Solve MDP
 v, q, logp, truep = linearvalueiteration(mdp_data, r)
@@ -207,17 +281,20 @@ optimal_policy = np.argmax(truep.detach().cpu().numpy(), axis=1)
 #Sample paths
 print("\n... sampling paths from true R ... \n")
 example_samples = sampleexamples(N,T, mdp_solution, mdp_data)
-print("\n... done ... \n")
+print("... done ... \n")
 
-#Set likelihood variables
-lh = Likelihood()
-lh.set_variables_for_likehood(mdp_data, N, T, example_samples)
 
-print("\nTrue R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(r, lh.negated_likelihood(r), optimal_policy))
+#Calculations
+NLL = myNLL() #initialise  loss
+NLL.calc_var_values(mdp_data, N, T, example_samples)
+trueNLL = NLL.NLL(r)
+print("\nTrue R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(r, trueNLL, optimal_policy))
 
-mnms = minimisers()
-#mnms.minimise_likelihood_with_torch(lh, 'LBFGS') #use this when on MBP M1
-mnms.minimise_likelihood_with_torch(lh, 'Adam')
+
+minimise = minimise()
+minimise.linearNN(evdThreshold = 0.003)
+
+
   
 
 

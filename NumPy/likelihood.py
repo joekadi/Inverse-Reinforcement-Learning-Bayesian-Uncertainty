@@ -131,4 +131,26 @@ class Likelihood:
         #return -dr for descent
         #print('Gradient \n{}'.format(-dr))
         return -dr
+
+    def negated_likelihood_with_gradient(self, r):
+        
+        #Reshape R to expected
+        if(np.shape(r) != (4,5)):
+            r = np.reshape(r, (4,1))
+            r = np.tile(r, (1, 5))
+            
+        #Solve MDP with current reward
+        v, q, logp, p = linearvalueiteration(self.mdp_data, r)
+
+        #Calculate likelihood from logp
+        likelihood = sum(sum(logp*self.mu_sa))
+        print(likelihood)
+        
+        D = linearmdpfrequency(self.mdp_data,p,self.initD) 
+
+        #Compute gradient.
+        dr = self.muE - np.matmul(self.F.T,D)
+        
+        return -likelihood, -dr
+
     

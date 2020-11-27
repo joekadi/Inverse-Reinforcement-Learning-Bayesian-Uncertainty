@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 torch.set_printoptions(precision=3)
 
-class Likelihood():
+class myNLL():
 
     mdp_data = {} 
     N, T  = 0,0 
@@ -27,8 +27,8 @@ class Likelihood():
         self.example_samples = example_samples
         self.transitions = len(self.mdp_data['sa_p'][0][0])
         
-        '''
         
+        '''
         #set mu_sa & initD = matlab to test with same sampled paths
         #for normal run keep below code commented
         
@@ -51,8 +51,8 @@ class Likelihood():
                             [0,1,0,0],
                             [0,0,1,0],
                             [0,0,0,1]], dtype=torch.float64)
-        
         '''
+        
         
         #Compute feature expectations.
         self.F = torch.eye(self.mdp_data['states'], dtype=torch.float64)
@@ -95,7 +95,6 @@ class Likelihood():
                 for k in range(self.transitions):
                     sp = self.mdp_data['sa_s'][s,a,k]
                     self.initD[sp] = self.initD[sp] - self.mdp_data['discount']*self.mdp_data['sa_p'][s,a,k]
-        
         '''
         print('mu_sa \n{}\n'.format(self.mu_sa))
         print('muE \n{}\n'.format(self.muE))
@@ -104,8 +103,8 @@ class Likelihood():
         print('Features \n{}\n'.format(features))
         '''
 
-    def negated_likelihood(self, r):
-        #ctx.save_for_backward(r, self.F)
+    def NLL(self, r):
+        #ctx.save_for_backward(r)
         #Reformat R
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r)
@@ -121,12 +120,11 @@ class Likelihood():
         likelihood = sum(sum(logp*self.mu_sa))
         return -likelihood
 
-    def calc_gradient(self, r):
-
+    def gradient(self, r):
+        #r, F = ctx.saved_tensors
         #Reformat R
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r)
-            
         if(r.shape != (self.mdp_data['states'],5)):
             r = torch.reshape(r, (self.mdp_data['states'],1))
             r = r.repeat((1, 5))
@@ -134,34 +132,15 @@ class Likelihood():
         #Compute state visitation count D
         D = linearmdpfrequency(self.mdp_data,self.p.detach().cpu().numpy(),self.initD.detach().cpu().numpy())
         D = torch.tensor(D)
-
         #Compute gradient.
+
         dr = self.muE - torch.matmul(torch.t(self.F),D)
        
-        #return -dr for descent
         return -dr
 
-    def negated_likelihood_with_grad(self, r):
-        #Reformat R
-        if(torch.is_tensor(r) == False):
-            r = torch.tensor(r)
-        if(r.shape != (self.mdp_data['states'],5)):
-            r = torch.reshape(r, (self.mdp_data['states'],1))
-            r = r.repeat((1, 5))
-        self.initD = torch.reshape(self.initD, (self.mdp_data['states'],1))
-        #Solve MDP with current reward
-        v, q, logp, p = linearvalueiteration(self.mdp_data, r)
-        #Compute state visitation count D
-        D = linearmdpfrequency(self.mdp_data,p.detach().cpu().numpy(),self.initD.detach().cpu().numpy())
-        D = torch.tensor(D)
-        #Compute gradient.
-        dr = self.muE - torch.matmul(torch.t(self.F),D)
-        #Calculate likelihood from logp
-        likelihood = sum(sum(logp*self.mu_sa))
-        return -likelihood, -dr.detach().cpu().numpy()
-
-    def calculate_EVD(self, trueP):
+    def calculate_EVD(self, trueP, guessR):
+        v, q, logp, guessP = linearvalueiteration(self.mdp_data, guessR)
         #EVD = diff in policies since exact True R values never actually learned, only it's structure
-        evd=torch.max(torch.abs(self.p-trueP))
+        evd=torch.max(torch.abs(guessP-trueP))
         return evd
 
