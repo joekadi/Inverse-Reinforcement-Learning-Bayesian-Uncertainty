@@ -1,5 +1,5 @@
-# MSci-Project
-MaxEnt Inverse reinforcement learning model
+# MaxEnt Inverse reinforcement learning model 
+This as part of my Computing Science Level 5 MSci Project @ Glasgow University
 ## Done
 - Linear IRL model numPy
 - Linear IRL model pyTorch
