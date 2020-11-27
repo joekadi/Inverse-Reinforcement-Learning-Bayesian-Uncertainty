@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 torch.set_printoptions(precision=3)
 
-class myNLL():
+class myNLL(torch.autograd.Function):
 
     mdp_data = {} 
     N, T  = 0,0 
@@ -102,8 +102,8 @@ class myNLL():
         print('F \n{}\n'.format(self.F))
         print('Features \n{}\n'.format(features))
         '''
-
-    def NLL(self, r):
+    @staticmethod
+    def forward(ctx, self, r):
         #ctx.save_for_backward(r)
         #Reformat R
         if(torch.is_tensor(r) == False):
@@ -119,6 +119,11 @@ class myNLL():
         #Calculate likelihood from logp
         likelihood = sum(sum(logp*self.mu_sa))
         return -likelihood
+
+    @staticmethod
+    def backward(ctx, self, grad_output, weightVector):
+        grad_input = grad_output.mm(weightVector)
+        return grad_input
 
     def gradient(self, r):
         #r, F = ctx.saved_tensors
@@ -137,6 +142,9 @@ class myNLL():
         dr = self.muE - torch.matmul(torch.t(self.F),D)
        
         return -dr
+
+
+
 
     def calculate_EVD(self, trueP, guessR):
         v, q, logp, guessP = linearvalueiteration(self.mdp_data, guessR)

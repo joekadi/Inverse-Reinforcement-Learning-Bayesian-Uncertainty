@@ -96,10 +96,11 @@ class minimise:
 			net.zero_grad()
 			output = net(X.view(-1,4))
 			evd = NLL.calculate_EVD(truep, torch.transpose(output, 0, 1).repeat(1,5))
-			loss = NLL.NLL(output)
+			loss = NLL(output)
 			print('EstR: {} | loss: {} | EVD: {}'.format(output, loss, NLL.calculate_EVD(r, torch.transpose(output, 0, 1).repeat(1,5))))
 			#loss.backward(NLL.gradient(output).repeat(1,4)) 
-			net.fc1.weight.grad = NLL.gradient(output).repeat(1,4)
+			loss.backward(net.fc1.weight, NLL.gradient(output).repeat(1,4))
+			#net.fc1.weight.grad = NLL.gradient(output).repeat(1,4)
 			optimizer.step()
 			#store
 			NLList.append(loss)
@@ -287,7 +288,7 @@ print("... done ... \n")
 #Calculations
 NLL = myNLL() #initialise  loss
 NLL.calc_var_values(mdp_data, N, T, example_samples)
-trueNLL = NLL.NLL(r)
+trueNLL = NLL.apply(NLL, r)
 print("\nTrue R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(r, trueNLL, optimal_policy))
 
 

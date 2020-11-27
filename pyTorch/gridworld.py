@@ -51,10 +51,3 @@ def gridworldbuild(mdp_params):
                     r[y*mdp_params['n']+x, :] = macro_reward.repeat([1,5])
 
     return mdp_data, r
-
-
-
-
-
-
-

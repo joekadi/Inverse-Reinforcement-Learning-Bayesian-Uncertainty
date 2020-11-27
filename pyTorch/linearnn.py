@@ -14,6 +14,9 @@ class LinearNet(nn.Module):
 		x = self.fc1(x)
 		return x
 
+	
+
+
 
 '''
 #code to isolate test linearNN
