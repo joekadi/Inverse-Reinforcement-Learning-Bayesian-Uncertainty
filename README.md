@@ -1,12 +1,12 @@
 # MSci-Project
 MaxEnt Inverse reinforcement learning model
 # Done
-- Linear model numPy
-- Linear model pyTorch
-- Linear Neural Network
+- Linear IRL model numPy
+- Linear IRL model pyTorch
+- Linear IRL w/ Neural Network
 
 # ToDo
-- Linear GP
-- Non-Linear Neural Network
-- Non-Linear GP
-- Non-Linear GP w/ Stochastic Variational Inference?
+- Linear IRL w/ Gaussian Process
+- Non-Linear IRL w/ Neural Network
+- Non-Linear IRL w/ Gaussian Process
+- Non-LinearIRL w/ Gaussian Process using Stochastic Variational Inference?
