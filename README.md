@@ -1,4 +1,4 @@
-# MaxEnt Inverse reinforcement learning model 
+# MaxEnt Inverse Reinforcement Learning Model 
 This as part of my Computing Science Level 5 MSci Project @ Glasgow University
 ## Done
 - Linear IRL model numPy
