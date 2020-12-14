@@ -44,7 +44,7 @@ def linearmdpfrequency(mdp_data,p,initD):
         RHS = RHS0*mdp_data['discount']
 
         Dpi = np.multiply(LHS, RHS)
-        D_CSR = sps.csc_matrix((Dpi.flatten(1), mdp_data['sa_s'].detach().cpu().numpy().flatten(1),np.arange(states*actions*transitions+1)), shape=(states,states*actions*transitions)) 
+        D_CSR = sps.csc_matrix((Dpi.flatten('F'), mdp_data['sa_s'].detach().cpu().numpy().flatten('F'),np.arange(states*actions*transitions+1)), shape=(states,states*actions*transitions)) 
         D_CSR.eliminate_zeros()
         D_mx = np.matmul(D_CSR.todense(),np.ones((states*actions*transitions,1)))
         D_s = np.sum(D_mx,1)
@@ -52,3 +52,4 @@ def linearmdpfrequency(mdp_data,p,initD):
         diff = np.max(np.abs(np.subtract(D,Dp)))
 
     return D
+

@@ -1,15 +1,15 @@
 import numpy as np
-import scipy.sparse as sps
 from linervalueiteration import *
 from linearmdpfrequency import *
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
-import torch.nn.functional as F
+from gridworld import *
 torch.set_printoptions(precision=3)
 
-class myNLL(torch.autograd.Function):
+class myNLL(nn.Module):
 
+    #make class variables to enable access ctx
     mdp_data = {} 
     N, T  = 0,0 
     example_samples = []
@@ -18,7 +18,6 @@ class myNLL(torch.autograd.Function):
     mu_sa = None
     initD = None
     p = None
-
 
     def calc_var_values(self, mdp_data, N, T, example_samples):
         self.mdp_data = mdp_data
@@ -102,53 +101,50 @@ class myNLL(torch.autograd.Function):
         print('F \n{}\n'.format(self.F))
         print('Features \n{}\n'.format(features))
         '''
-    @staticmethod
-    def forward(ctx, self, r):
-        #ctx.save_for_backward(r)
-        #Reformat R
-        if(torch.is_tensor(r) == False):
-            r = torch.tensor(r)
-        if(r.shape != (self.mdp_data['states'],5)):
-            #print('Reward in reshape \n{}'.format(r))
-            r = torch.reshape(r, (self.mdp_data['states'],1))
-            r = r.repeat((1, 5))
-        self.initD = torch.reshape(self.initD, (self.mdp_data['states'],1))
-        #Solve MDP with current reward
-        v, q, logp, p = linearvalueiteration(self.mdp_data, r)
-        self.p = p
+
+    def forward(self, r):
+        print('Init D {}'.format(initD))
+        #Returns NLL w.r.t input r
+        r = self.reshapeReward(r)
+        self.initD = torch.reshape(self.initD, (self.mdp_data['states'],1)) 
+        v, q, logp, p = linearvalueiteration(self.mdp_data, r) #Solve MDP with current reward
+        self.p = p #set policy w.r.t current r for backward
+
         #Calculate likelihood from logp
-        likelihood = sum(sum(logp*self.mu_sa))
+        #torch.sum
+        likelihood = sum(sum(logp*self.mu_sa)) #for scalar likelihood
+
+        #mul = logp*self.mu_sa #hold
+        #likelihood = torch.sum(mul, dim=1)#likelihood for each state as tensor size (states,1)
+        #likelihood = likelihood.view(self.mdp_data['states'],1) #make column vector
+        #likelihood.requires_grad = True
         return -likelihood
 
-    @staticmethod
-    def backward(ctx, self, grad_output, weightVector):
-        grad_input = grad_output.mm(weightVector)
-        return grad_input
 
-    def gradient(self, r):
-        #r, F = ctx.saved_tensors
-        #Reformat R
+    def backward(self, r):
+        #Should return as many gradient te w.r.t to inputs
+        r = self.reshapeReward(r)
+        D = linearmdpfrequency(self.mdp_data,self.p.detach().cpu().numpy(),self.initD.detach().cpu().numpy())#Compute state visitation count D
+        D = torch.tensor(D) #Cast to tensor
+        dr = self.muE - torch.matmul(torch.t(self.F),D) #Compute gradient
+        dr = dr.view(len(dr)) #Make row vector
+        print('-dr inside myNLL.backward {}'.format(-dr))
+        return -dr #+dr, return -dr for descent 
+
+    def reshapeReward(self, r):
+        #Reshapes R to be in format (states,actions)
         if(torch.is_tensor(r) == False):
-            r = torch.tensor(r)
+            r = torch.tensor(r) #cast to tensor
         if(r.shape != (self.mdp_data['states'],5)):
+            #reformat to be in shape (states,actions)
             r = torch.reshape(r, (self.mdp_data['states'],1))
             r = r.repeat((1, 5))
+        return r 
 
-        #Compute state visitation count D
-        D = linearmdpfrequency(self.mdp_data,self.p.detach().cpu().numpy(),self.initD.detach().cpu().numpy())
-        D = torch.tensor(D)
-        #Compute gradient.
-
-        dr = self.muE - torch.matmul(torch.t(self.F),D)
-       
-        return -dr
-
-
-
-
-    def calculate_EVD(self, trueP, guessR):
-        v, q, logp, guessP = linearvalueiteration(self.mdp_data, guessR)
-        #EVD = diff in policies since exact True R values never actually learned, only it's structure
-        evd=torch.max(torch.abs(guessP-trueP))
+    def calculate_EVD(self, trueP):
+        #Expected Value Diff = diff in policies since exact True R values never actually learned, only it's structure
+        evd=torch.max(torch.abs(self.p-trueP))
         return evd
+
+
 

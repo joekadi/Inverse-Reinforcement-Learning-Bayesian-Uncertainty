@@ -27,7 +27,7 @@ class Likelihood():
         self.example_samples = example_samples
         self.transitions = len(self.mdp_data['sa_p'][0][0])
         
-        '''
+        
         
         #set mu_sa & initD = matlab to test with same sampled paths
         #for normal run keep below code commented
@@ -96,7 +96,7 @@ class Likelihood():
                     sp = self.mdp_data['sa_s'][s,a,k]
                     self.initD[sp] = self.initD[sp] - self.mdp_data['discount']*self.mdp_data['sa_p'][s,a,k]
         
-        '''
+        
         print('mu_sa \n{}\n'.format(self.mu_sa))
         print('muE \n{}\n'.format(self.muE))
         print('initD \n{}\n'.format(self.initD))
@@ -118,7 +118,11 @@ class Likelihood():
         v, q, logp, p = linearvalueiteration(self.mdp_data, r)
         self.p = p
         #Calculate likelihood from logp
-        likelihood = sum(sum(logp*self.mu_sa))
+        #likelihood = sum(sum(logp*self.mu_sa))
+        
+        mul = logp*self.mu_sa
+        likelihood = torch.sum(mul, dim=1)#.view(len(mul),1) #likelihood for each state as tensor size (states,1)
+        likelihood.requires_grad = True
         return -likelihood
 
     def calc_gradient(self, r):
@@ -137,9 +141,14 @@ class Likelihood():
 
         #Compute gradient.
         dr = self.muE - torch.matmul(torch.t(self.F),D)
+        dr = dr.view(len(dr)) #make row vector
        
-        #return -dr for descent
-        return -dr
+        return dr #positive gradient, return -dr for descent 
+
+    def calculate_EVD(self, trueP):
+        #EVD = diff in policies since exact True R values never actually learned, only it's structure
+        evd=torch.max(torch.abs(self.p-trueP))
+        return evd
 
     def negated_likelihood_with_grad(self, r):
         #Reformat R
@@ -160,8 +169,5 @@ class Likelihood():
         likelihood = sum(sum(logp*self.mu_sa))
         return -likelihood, -dr.detach().cpu().numpy()
 
-    def calculate_EVD(self, trueP):
-        #EVD = diff in policies since exact True R values never actually learned, only it's structure
-        evd=torch.max(torch.abs(self.p-trueP))
-        return evd
+
 

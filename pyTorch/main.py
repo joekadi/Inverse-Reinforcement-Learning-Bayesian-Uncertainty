@@ -6,6 +6,7 @@ import numpy as np
 np.set_printoptions(suppress=True) 
 from likelihood import *
 from myNLL import *
+from NLLFunction import *
 from scipy.optimize import minimize, check_grad
 import torch
 from torch.autograd import Variable
@@ -14,9 +15,10 @@ from linearnn import *
 import torch.nn.functional as F
 torch.set_printoptions(precision=3)
 torch.set_default_tensor_type(torch.DoubleTensor) #default type to torch.float64
+np.set_printoptions(precision=3)
 
 class testers:
-	def checkgradients(lh, mdp_params, k):
+	def checkgradients(self, lh, mdp_params, k):
 		#checking gradient for k reward function points
 
 		rewardsToCheck = []
@@ -45,17 +47,17 @@ class testers:
 		plt.grid(b='True', which='minor')
 		plt.show()
 
-	def test_gradient(lh, testr):
+	def test_gradient(self, lh, testr):
 		print('Gradient for test r is \n{}'.format(lh.calc_gradient(testr)))
 		return(lh.calc_gradient(testr))
 
-	def test_likelihood(lh, testr):
+	def test_likelihood(self, lh, testr):
 		print('Likelihood for test r is {}'.format(lh.negated_likelihood(testr)))
 		return(lh.negated_likelihood(testr))
 
-	def compare_gandLH_with_matlab(lh):
-		torchG = test_gradient(lh, testr)
-		torchL =test_likelihood(lh, testr)
+	def compare_gandLH_with_matlab(self, lh):
+		torchG = self.est_gradient(lh, testr)
+		torchL = self.test_likelihood(lh, testr)
 
 		testr = np.array(
 		[[5.11952e+01],
@@ -74,63 +76,128 @@ class testers:
 
 class minimise:
 
-	def linearNN(self, evdThreshold):
-		NLL = myNLL() 
-		NLL.calc_var_values(mdp_data, N, T, example_samples) #set req variables
-		net = LinearNet() 
+	def linearNN(self, evdThreshold, optim_type):
+		net = LinearNet()
+		
+		
+		X = torch.Tensor([[0, 0],
+						  [98, 0],
+						  [12, 0],
+						  [44, 0]]) #for NN(state feature vector) = reward
+		
+
+
+		'''
 		X = torch.Tensor([[0],
-						  [1],
-						  [2],
-						  [3]]) #initalise state features
+				  [1],
+				  [2],
+				  [3]]) #for (4,4) NN
+		'''
+
 		evd = 10 
-		lr = 0.25
+		lr = 0.1
 		finaloutput = None
 		#lists for printing
 		NLList = []
 		iterations = []
 		evdList = []
-		optimizer = torch.optim.Adam(net.parameters(), lr=lr) #inital optimiser
 		i = 0
+		
+		if (optim_type == 'Adam'):
+			print('\nOptimising with torch.Adam\n')
+			optimizer = torch.optim.Adam(net.parameters(), lr=lr) #inital adam optimiser
+			#while(evd > evdThreshold):
+			for l in range(200):
 
-		while(evd > evdThreshold):
-			net.zero_grad()
-			output = net(X.view(-1,4))
-			evd = NLL.calculate_EVD(truep, torch.transpose(output, 0, 1).repeat(1,5))
-			loss = NLL(output)
-			print('EstR: {} | loss: {} | EVD: {}'.format(output, loss, NLL.calculate_EVD(r, torch.transpose(output, 0, 1).repeat(1,5))))
-			#loss.backward(NLL.gradient(output).repeat(1,4)) 
-			loss.backward(net.fc1.weight, NLL.gradient(output).repeat(1,4))
-			#net.fc1.weight.grad = NLL.gradient(output).repeat(1,4)
-			optimizer.step()
-			#store
-			NLList.append(loss)
-			iterations.append(i)
-			evdList.append(evd)
-			finaloutput = output
-			i += 1
+				net.zero_grad()
+				
+				#build output vector as reward for each state w.r.t its features
+				output = torch.empty(len(X))
+				indexer = 0
+				for f in X: 
+					thisR = net(f.view(-1,len(f)))
+					output[indexer] = thisR
+					indexer += 1
 
+				#print('Output {} with grad fn {}'.format(output, output.grad_fn))
 
-		'''
+				#output.requires_grad = True
+				loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data) #get loss from curr output
+				#print('Loss {} with grad fn {}'.format(loss, loss.grad_fn))
+				loss.backward() #propagate grad through network
+				evd = NLL.calculate_EVD(truep, output) #calc EVD
+				j = 1
+				for p in net.parameters():
+					print('Gradient of parameter {} with shape {} is {}'.format(j, p.shape, p.grad))
+					j +=1
+				j = 0
+				optimizer.step()
 
-		optimizer = torch.optim.LBFGS(net.parameters(), lr=lr)
-		def closure():
-		net.zero_grad()
-		output = net(X.view(-1,4))
-		loss = NLL.NLL(output)
-		net.fc1.weight.grad = NLL.gradient(output).repeat(1,4)
-		print('EstR of {} with loss {}'.format(output, loss))
-		lhList.append(loss)
-		iterations.append(i)
-		return loss
-		for i in range(500):
-		optimizer.step(closure)
-		'''
+				#Printline when LH is vector
+				#print('{}: output: {} | EVD: {} | loss: {} | {}'.format(i, output.detach().numpy(), evd,loss.detach().numpy(), sum(loss).detach().numpy()))
+				#Printline when LH scalar
+				print('{}: output: {} | EVD: {} | loss: {} '.format(i, output.detach().numpy(), evd,loss.detach().numpy()))
 
+				#store metrics for printing 
+				NLList.append(loss.item())
+				iterations.append(i)
+				evdList.append(evd.item())
+				finaloutput = output
+				i += 1
+		else:
+			print('\nOptimising with torch.LBFGS\n')
+			optimizer = torch.optim.LBFGS(net.parameters(), lr=lr)
+			def closure():
+				net.zero_grad()
+				output = net(X.view(-1,4)) #when NLL layer is (4,4)
+				loss = NLL.negated_likelihood(output)
+				loss = sum(loss)
+				evd = NLL.calculate_EVD(truep)
+				print('{}: output: {} | EVD: {} | loss: {}'.format(i, output.detach().numpy(), evd,loss.detach().numpy()))
+				current_gradient = NLL.calc_gradient(output)
+				#print('Current gradient \n{}'.format(current_gradient))
 
-		plt.plot(iterations, NLLList)
+				#net.fc1.weight.grad = current_gradient.repeat(1,4) 
+				loss.backward(gradient=torch.argmax(current_gradient)) #much worse than above
+				'''												 
+				print('Calculated grad \n {}'.format(current_gradient))
+				j = 1
+				for p in net.parameters():
+					print('Gradient of parameter {} \n {}'.format(j, p.grad))
+					j +=1
+				j = 0
+				'''
+
+				#store metrics for printing 
+				NLList.append(sum(loss).item())
+				iterations.append(i)
+				evdList.append(evd.item())
+				finaloutput = output
+				return loss #.max().detach().numpy()
+			for i in range(500):
+				optimizer.step(closure)
+
+		#Normalise data
+		#NLList = [float(i)/sum(NLList) for i in NLList]
+		#evdList = [float(i)/sum(evdList) for i in evdList]
+		
+		#plot
+		f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+		ax1.plot(iterations, NLList)
+		ax1.plot(iterations, NLList, 'r+')
+		ax1.set_title('NLL')
+
+		ax2.plot(iterations, evdList)
+		ax2.plot(iterations, evdList, 'r+')
+		ax2.set_title('Expected Value Diff')
 		plt.show()
-		print('\nTrue R: {}'.format(r[:,0]))
-		print('\nFinal Estimated R after 500 optim steps: {}'.format(finaloutput))
+
+		#calculate metrics for printing
+		v, q, logp, thisp = linearvalueiteration(mdp_data, output.view(4,1)) #to get policy under out R
+		thisoptimal_policy = np.argmax(thisp.detach().cpu().numpy(), axis=1) 
+
+		print('\nTrue R: \n{}\n - with optimal policy {}'.format(r[:,0].view(4,1), optimal_policy))
+		print('\nFinal Estimated R after 100 optim steps: \n{}\n - with optimal policy {}\n - avg EVD of {}'.format(finaloutput.view(4,1),thisoptimal_policy, sum(evdList)/len(evdList)))
 
 	def torchbasic(self, lh, type_optim):
 		
@@ -250,9 +317,6 @@ class minimise:
 		foundRprintlist = [foundR, foundLH, found_optimal_policy]
 		print("\nFound R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(*foundRprintlist))
 
-	
-
-
 #set mdp params
 mdp_params = {'n':2, 'b':1, 'determinism':1.0, 'discount':0.99, 'seed': 0}
 N = 1000
@@ -261,7 +325,7 @@ T = 8
 print("\n... generating MDP and intial R ... \n")
 #generate mdp and R
 mdp_data, r = gridworldbuild(mdp_params)
-print("... done ... \n")
+print("... done ...")
 
 #set true R equal matlab impl w/ random seed 0
 #not a reward func ... a look up table
@@ -273,7 +337,6 @@ r = torch.Tensor(np.array(
 	    [4.5339  ,  4.5339  ,  4.5339 ,   4.5339 ,   4.5339]
 	 ], dtype=np.float64))
 
-
 #Solve MDP
 v, q, logp, truep = linearvalueiteration(mdp_data, r)
 mdp_solution = {'v': v, 'q':q, 'p':truep, 'logp': logp}
@@ -282,18 +345,29 @@ optimal_policy = np.argmax(truep.detach().cpu().numpy(), axis=1)
 #Sample paths
 print("\n... sampling paths from true R ... \n")
 example_samples = sampleexamples(N,T, mdp_solution, mdp_data)
-print("... done ... \n")
+print("... done ...")
 
+NLL = NLLFunction() #initialise NLL
+initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples) #calculate required variables 
 
-#Calculations
-NLL = myNLL() #initialise  loss
-NLL.calc_var_values(mdp_data, N, T, example_samples)
-trueNLL = NLL.apply(NLL, r)
-print("\nTrue R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(r, trueNLL, optimal_policy))
+#assign constant class variable
+NLL.F = F
+NLL.muE = muE
+NLL.mu_sa = mu_sa
+NLL.initD = initD
+NLL.mdp_data = mdp_data
+
+trueNLL = NLL.apply(r,initD, mu_sa, muE, F, mdp_data) #NLL for true R
+
+#Printline if LH is tensor
+#print("\nTrue R is \n{}\n with negated tensor likelihood of \n{}\n total: {}\n and optimal policy: {}\n".format(r, trueNLL.view(4).detach().numpy(), sum(trueNLL).detach().numpy(), optimal_policy))
+
+#Printline if LH is scalar
+print("\nTrue R is \n{}\n with negated tensor likelihood of \n{}\n and optimal policy: {}\n".format(r, trueNLL, optimal_policy))
 
 
 minimise = minimise()
-minimise.linearNN(evdThreshold = 0.003)
+minimise.linearNN(evdThreshold = 0.003, optim_type = 'Adam')
 
 
   
