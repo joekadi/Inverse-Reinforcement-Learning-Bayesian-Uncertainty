@@ -10,6 +10,8 @@ from NLLFunction import *
 from scipy.optimize import minimize, check_grad
 import torch
 from torch.autograd import Variable
+from torch.autograd import gradcheck
+
 import matplotlib.pyplot as plt
 from linearnn import *
 import torch.nn.functional as F
@@ -18,6 +20,14 @@ torch.set_default_tensor_type(torch.DoubleTensor) #default type to torch.float64
 np.set_printoptions(precision=3)
 
 class testers:
+
+	def checkgradients_NN(self, input, linear):
+		# gradcheck takes a tuple of tensors as input, check if your gradient
+		# evaluated with these tensors are close enough to numerical
+		# approximations and returns True if they all verify this condition.
+		test = gradcheck(linear, input, eps=1e-6, atol=1e-4)
+		print('Gradient check; {}'.format(test))
+
 	def checkgradients(self, lh, mdp_params, k):
 		#checking gradient for k reward function points
 
@@ -78,12 +88,24 @@ class minimise:
 
 	def linearNN(self, evdThreshold, optim_type):
 		net = LinearNet()
+		tester = testers()		
 		
+		#initialise rewards by finding true weights for NN. feed features through NN using true Weights to get ground truth reward.
 		
+		#initalise with some noise? can we still uncover sensible reward
+
+
+		#put an l2 regulisariton weight decay on the network weights. fine tune the lambda value
+		#  bias = false on weight params seems to work when inital R is 0 
+
+		#check gradients with torch.gradcheck
+
 		X = torch.Tensor([[0, 0],
-						  [98, 0],
-						  [12, 0],
-						  [44, 0]]) #for NN(state feature vector) = reward
+						  [1, 0],
+						  [2, 0],
+						  [3, 0]]) #for NN(state feature vector) = reward 
+
+		  
 		
 
 
@@ -105,9 +127,9 @@ class minimise:
 		
 		if (optim_type == 'Adam'):
 			print('\nOptimising with torch.Adam\n')
-			optimizer = torch.optim.Adam(net.parameters(), lr=lr) #inital adam optimiser
+			optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-2) #inital adam optimiser, weight decay for l2 regularisation
 			#while(evd > evdThreshold):
-			for l in range(200):
+			for l in range(400):
 
 				net.zero_grad()
 				
@@ -119,11 +141,16 @@ class minimise:
 					output[indexer] = thisR
 					indexer += 1
 
-				#print('Output {} with grad fn {}'.format(output, output.grad_fn))
 
-				#output.requires_grad = True
 				loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data) #get loss from curr output
+				
+
+				#check gradients
+				#tester.checkgradients_NN(output, NLL)
+
+				#print('Output {} with grad fn {}'.format(output, output.grad_fn))
 				#print('Loss {} with grad fn {}'.format(loss, loss.grad_fn))
+
 				loss.backward() #propagate grad through network
 				evd = NLL.calculate_EVD(truep, output) #calc EVD
 				j = 1
@@ -131,7 +158,10 @@ class minimise:
 					print('Gradient of parameter {} with shape {} is {}'.format(j, p.shape, p.grad))
 					j +=1
 				j = 0
+
 				optimizer.step()
+
+
 
 				#Printline when LH is vector
 				#print('{}: output: {} | EVD: {} | loss: {} | {}'.format(i, output.detach().numpy(), evd,loss.detach().numpy(), sum(loss).detach().numpy()))
@@ -317,9 +347,12 @@ class minimise:
 		foundRprintlist = [foundR, foundLH, found_optimal_policy]
 		print("\nFound R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(*foundRprintlist))
 
+
+#goal LH this time is: 48711.17683105555
+
 #set mdp params
 mdp_params = {'n':2, 'b':1, 'determinism':1.0, 'discount':0.99, 'seed': 0}
-N = 1000
+N = 5000
 T = 8
 
 print("\n... generating MDP and intial R ... \n")
@@ -329,13 +362,22 @@ print("... done ...")
 
 #set true R equal matlab impl w/ random seed 0
 #not a reward func ... a look up table
+
 r = torch.Tensor(np.array(
 	[
-		[0.0005  ,  0.0005  ,  0.0005  ,  0.0005  ,  0.0005],
-	    [0.0000   , 0.0000   , 0.0000   , 0.0000   , 0.0000],
-	    [4.5109  ,  4.5109  ,  4.5109  ,  4.5109   , 4.5109],
-	    [4.5339  ,  4.5339  ,  4.5339 ,   4.5339 ,   4.5339]
-	 ], dtype=np.float64))
+		[0.0000 ,  0.0000  ,  0.0000  ,  0.0000  ,  0.0000],
+	    [1.   , 1.   , 1.   , 1.   , 1.],
+	    [2.,2.,2.,2.,2.],
+	    [3.  , 3.  ,  3.,   3.,   3.0]], dtype=np.float64))
+		
+"""
+r = torch.Tensor(np.array(
+	[
+		[3.0 ,  3.0  ,  3.0  ,  3.0  ,  3.0],
+	    [4.0   , 4.0   , 4.0   , 4.0   , 4.0],
+	    [5.,5.,5.,5.,5.],
+	    [6., 6.,6.,6.,6.]], dtype=np.float64))
+"""
 
 #Solve MDP
 v, q, logp, truep = linearvalueiteration(mdp_data, r)
@@ -366,11 +408,11 @@ trueNLL = NLL.apply(r,initD, mu_sa, muE, F, mdp_data) #NLL for true R
 print("\nTrue R is \n{}\n with negated tensor likelihood of \n{}\n and optimal policy: {}\n".format(r, trueNLL, optimal_policy))
 
 
+#find true r
 minimise = minimise()
 minimise.linearNN(evdThreshold = 0.003, optim_type = 'Adam')
 
 
-  
 
 
 
