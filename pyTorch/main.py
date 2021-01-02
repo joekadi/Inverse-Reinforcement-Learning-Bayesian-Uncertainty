@@ -11,9 +11,9 @@ from scipy.optimize import minimize, check_grad
 import torch
 from torch.autograd import Variable
 from torch.autograd import gradcheck
-
 import matplotlib.pyplot as plt
 from linearnn import *
+from nonlinearnn import *
 import torch.nn.functional as F
 torch.set_printoptions(precision=3)
 torch.set_default_tensor_type(torch.DoubleTensor) #default type to torch.float64
@@ -86,6 +86,143 @@ class testers:
 
 class minimise:
 
+	def nonLinearNN(self, evdThreshold, optim_type):
+		net = NonLinearNet()
+		tester = testers()		
+		
+		#initialise rewards by finding true weights for NN. feed features through NN using true Weights to get ground truth reward.
+		#initalise with some noise? can we still uncover sensible reward
+		#put an l2 regulisariton weight decay on the network weights. fine tune the lambda value
+		#bias = false on weight params seems to work when inital R is 0 
+		#check gradients with torch.gradcheck
+
+
+
+		X = torch.Tensor([[0, 0],
+						  [1, 0],
+						  [2, 0],
+						  [3, 0]]) #for NN(state feature vector) = reward 
+
+		evd = 10 
+		lr = 0.1
+		finaloutput = None
+		#lists for printing
+		NLList = []
+		iterations = []
+		evdList = []
+		i = 0
+		
+		if (optim_type == 'Adam'):
+			print('\nOptimising with torch.Adam\n')
+			optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-2) #inital adam optimiser, weight decay for l2 regularisation
+			while(evd > evdThreshold):
+				net.zero_grad()
+				
+				#build output vector as reward for each state w.r.t its features
+				output = torch.empty(len(X))
+				indexer = 0
+				for f in X:
+					thisR = net(f.view(-1,len(f)))
+					output[indexer] = thisR
+					indexer += 1
+
+
+				loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data) #get loss from curr output
+				
+
+				#check gradients
+				#tester.checkgradients_NN(output, NLL)
+
+				#print('Output {} with grad fn {}'.format(output, output.grad_fn))
+				#print('Loss {} with grad fn {}'.format(loss, loss.grad_fn))
+
+				loss.backward() #propagate grad through network
+				evd = NLL.calculate_EVD(truep, output) #calc EVD
+				'''
+				j = 1
+				for p in net.parameters():
+					print('Gradient of parameter {} with shape {} is {}'.format(j, p.shape, p.grad))
+					j +=1
+				j = 0
+				'''
+
+				optimizer.step()
+
+				#Printline when LH is vector
+				#print('{}: output: {} | EVD: {} | loss: {} | {}'.format(i, output.detach().numpy(), evd,loss.detach().numpy(), sum(loss).detach().numpy()))
+				#Printline when LH scalar
+				print('{}: output: {} | EVD: {} | loss: {} '.format(i, output.detach().numpy(), evd,loss.detach().numpy()))
+
+				#store metrics for printing 
+				NLList.append(loss.item())
+				iterations.append(i)
+				evdList.append(evd.item())
+				finaloutput = output
+				i += 1
+
+
+		else:
+			print('\nOptimising with torch.LBFGS\n')
+			optimizer = torch.optim.LBFGS(net.parameters(), lr=lr)
+			def closure():
+				net.zero_grad()
+				output = net(X.view(-1,4)) #when NLL layer is (4,4)
+				loss = NLL.negated_likelihood(output)
+				loss = sum(loss)
+				evd = NLL.calculate_EVD(truep)
+				print('{}: output: {} | EVD: {} | loss: {}'.format(i, output.detach().numpy(), evd,loss.detach().numpy()))
+				current_gradient = NLL.calc_gradient(output)
+				#print('Current gradient \n{}'.format(current_gradient))
+
+				#net.fc1.weight.grad = current_gradient.repeat(1,4) 
+				loss.backward(gradient=torch.argmax(current_gradient)) #much worse than above
+				'''												 
+				print('Calculated grad \n {}'.format(current_gradient))
+				j = 1
+				for p in net.parameters():
+					print('Gradient of parameter {} \n {}'.format(j, p.grad))
+					j +=1
+				j = 0
+				'''
+
+				#store metrics for printing 
+				NLList.append(sum(loss).item())
+				iterations.append(i)
+				evdList.append(evd.item())
+				finaloutput = output
+				return loss #.max().detach().numpy()
+			for i in range(500):
+				optimizer.step(closure)
+
+		#Normalise data
+		#NLList = [float(i)/sum(NLList) for i in NLList]
+		#evdList = [float(i)/sum(evdList) for i in evdList]
+
+
+		print('Final FC1 Weight is: {}'.format(net.fc1.weight.data))
+		print('Reward of state 1 is: {}'.format(net(X[0])))
+		print('Reward of state 2 is: {}'.format(net(X[1])))
+		print('Reward of state 3 is: {}'.format(net(X[2])))
+		print('Reward of state 4 is: {}'.format(net(X[3])))
+		
+		#plot
+		f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+		ax1.plot(iterations, NLList)
+		ax1.plot(iterations, NLList, 'r+')
+		ax1.set_title('NLL')
+
+		ax2.plot(iterations, evdList)
+		ax2.plot(iterations, evdList, 'r+')
+		ax2.set_title('Expected Value Diff')
+		plt.show()
+
+		#calculate metrics for printing
+		v, q, logp, thisp = linearvalueiteration(mdp_data, output.view(4,1)) #to get policy under out R
+		thisoptimal_policy = np.argmax(thisp.detach().cpu().numpy(), axis=1) 
+
+		print('\nTrue R: \n{}\n - with optimal policy {}'.format(r[:,0].view(4,1), optimal_policy))
+		print('\nFinal Estimated R after 100 optim steps: \n{}\n - with optimal policy {}\n - avg EVD of {}'.format(finaloutput.view(4,1),thisoptimal_policy, sum(evdList)/len(evdList)))
+
 	def linearNN(self, evdThreshold, optim_type):
 		net = LinearNet()
 		tester = testers()		
@@ -128,9 +265,7 @@ class minimise:
 		if (optim_type == 'Adam'):
 			print('\nOptimising with torch.Adam\n')
 			optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-2) #inital adam optimiser, weight decay for l2 regularisation
-			#while(evd > evdThreshold):
-			for l in range(400):
-
+			while(evd > evdThreshold):
 				net.zero_grad()
 				
 				#build output vector as reward for each state w.r.t its features
@@ -153,15 +288,15 @@ class minimise:
 
 				loss.backward() #propagate grad through network
 				evd = NLL.calculate_EVD(truep, output) #calc EVD
+				'''
 				j = 1
 				for p in net.parameters():
 					print('Gradient of parameter {} with shape {} is {}'.format(j, p.shape, p.grad))
 					j +=1
 				j = 0
+				'''
 
 				optimizer.step()
-
-
 
 				#Printline when LH is vector
 				#print('{}: output: {} | EVD: {} | loss: {} | {}'.format(i, output.detach().numpy(), evd,loss.detach().numpy(), sum(loss).detach().numpy()))
@@ -363,21 +498,24 @@ print("... done ...")
 #set true R equal matlab impl w/ random seed 0
 #not a reward func ... a look up table
 
+"""
 r = torch.Tensor(np.array(
 	[
 		[0.0000 ,  0.0000  ,  0.0000  ,  0.0000  ,  0.0000],
 	    [1.   , 1.   , 1.   , 1.   , 1.],
 	    [2.,2.,2.,2.,2.],
 	    [3.  , 3.  ,  3.,   3.,   3.0]], dtype=np.float64))
-		
+42456.262947480514
+
 """
 r = torch.Tensor(np.array(
 	[
-		[3.0 ,  3.0  ,  3.0  ,  3.0  ,  3.0],
-	    [4.0   , 4.0   , 4.0   , 4.0   , 4.0],
+		[3.,3.,3.,3.,3.],
+		[6.,6.,6.,6.,6.],
 	    [5.,5.,5.,5.,5.],
-	    [6., 6.,6.,6.,6.]], dtype=np.float64))
-"""
+	    [2.,2.,2.,2.,2.]
+	], dtype=np.float64))
+
 
 #Solve MDP
 v, q, logp, truep = linearvalueiteration(mdp_data, r)
@@ -410,7 +548,10 @@ print("\nTrue R is \n{}\n with negated tensor likelihood of \n{}\n and optimal p
 
 #find true r
 minimise = minimise()
-minimise.linearNN(evdThreshold = 0.003, optim_type = 'Adam')
+#minimise.linearNN(evdThreshold = 0.003, optim_type = 'Adam')
+
+minimise.nonLinearNN(evdThreshold = 0.003, optim_type = 'Adam')
+
 
 
 
