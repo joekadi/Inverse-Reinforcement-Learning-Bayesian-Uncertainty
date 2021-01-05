@@ -86,8 +86,9 @@ class testers:
 
 class minimise:
 
-	def nonLinearNN(self, evdThreshold, optim_type):
-		net = NonLinearNet()
+	def nonLinearNN(self, evdThreshold, optim_type, net):
+
+		#net = NonLinearNet()
 		tester = testers()		
 		
 		#initialise rewards by finding true weights for NN. feed features through NN using true Weights to get ground truth reward.
@@ -97,15 +98,16 @@ class minimise:
 		#check gradients with torch.gradcheck
 
 
-
 		X = torch.Tensor([[0, 0],
 						  [1, 0],
 						  [2, 0],
-						  [3, 0]]) #for NN(state feature vector) = reward 
+						  [3, 0]
+						  ]) #for NN(state feature vector) = reward 
 
 		evd = 10 
 		lr = 0.1
 		finaloutput = None
+
 		#lists for printing
 		NLList = []
 		iterations = []
@@ -114,8 +116,9 @@ class minimise:
 		
 		if (optim_type == 'Adam'):
 			print('\nOptimising with torch.Adam\n')
-			optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-2) #inital adam optimiser, weight decay for l2 regularisation
-			while(evd > evdThreshold):
+			optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=1e-2) #weight decay for l2 regularisation
+			#while(evd > evdThreshold):
+			for i in range(50):
 				net.zero_grad()
 				
 				#build output vector as reward for each state w.r.t its features
@@ -126,26 +129,13 @@ class minimise:
 					output[indexer] = thisR
 					indexer += 1
 
-
 				loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data) #get loss from curr output
-				
-
 				#check gradients
 				#tester.checkgradients_NN(output, NLL)
-
 				#print('Output {} with grad fn {}'.format(output, output.grad_fn))
 				#print('Loss {} with grad fn {}'.format(loss, loss.grad_fn))
-
 				loss.backward() #propagate grad through network
 				evd = NLL.calculate_EVD(truep, output) #calc EVD
-				'''
-				j = 1
-				for p in net.parameters():
-					print('Gradient of parameter {} with shape {} is {}'.format(j, p.shape, p.grad))
-					j +=1
-				j = 0
-				'''
-
 				optimizer.step()
 
 				#Printline when LH is vector
@@ -160,50 +150,51 @@ class minimise:
 				finaloutput = output
 				i += 1
 
-
 		else:
 			print('\nOptimising with torch.LBFGS\n')
 			optimizer = torch.optim.LBFGS(net.parameters(), lr=lr)
+			i=0
 			def closure():
 				net.zero_grad()
-				output = net(X.view(-1,4)) #when NLL layer is (4,4)
-				loss = NLL.negated_likelihood(output)
-				loss = sum(loss)
-				evd = NLL.calculate_EVD(truep)
-				print('{}: output: {} | EVD: {} | loss: {}'.format(i, output.detach().numpy(), evd,loss.detach().numpy()))
-				current_gradient = NLL.calc_gradient(output)
-				#print('Current gradient \n{}'.format(current_gradient))
+				
+				#build output vector as reward for each state w.r.t its features
+				output = torch.empty(len(X))
+				indexer = 0
+				for f in X:
+					thisR = net(f.view(-1,len(f)))
+					output[indexer] = thisR
+					indexer += 1
 
-				#net.fc1.weight.grad = current_gradient.repeat(1,4) 
-				loss.backward(gradient=torch.argmax(current_gradient)) #much worse than above
-				'''												 
-				print('Calculated grad \n {}'.format(current_gradient))
-				j = 1
-				for p in net.parameters():
-					print('Gradient of parameter {} \n {}'.format(j, p.grad))
-					j +=1
-				j = 0
-				'''
+
+				loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data) #get loss from curr output
+				
+				#check gradients
+				#tester.checkgradients_NN(output, NLL)
+				#print('Output {} with grad fn {}'.format(output, output.grad_fn))
+				#print('Loss {} with grad fn {}'.format(loss, loss.grad_fn))
+
+				loss.backward() #propagate grad through network
+				evd = NLL.calculate_EVD(truep, output) #calc EVD
+				print('{}: output: {} | EVD: {} | loss: {} '.format(i, output.detach().numpy(), evd,loss.detach().numpy()))
 
 				#store metrics for printing 
-				NLList.append(sum(loss).item())
+				NLList.append(loss.item())
 				iterations.append(i)
 				evdList.append(evd.item())
 				finaloutput = output
-				return loss #.max().detach().numpy()
-			for i in range(500):
-				optimizer.step(closure)
+				i += 1
 
+				return loss
+
+			while(evd > evdThreshold):
+				optimizer.step(closure)
+				
+
+
+		'''
 		#Normalise data
 		#NLList = [float(i)/sum(NLList) for i in NLList]
 		#evdList = [float(i)/sum(evdList) for i in evdList]
-
-
-		print('Final FC1 Weight is: {}'.format(net.fc1.weight.data))
-		print('Reward of state 1 is: {}'.format(net(X[0])))
-		print('Reward of state 2 is: {}'.format(net(X[1])))
-		print('Reward of state 3 is: {}'.format(net(X[2])))
-		print('Reward of state 4 is: {}'.format(net(X[3])))
 		
 		#plot
 		f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
@@ -222,6 +213,8 @@ class minimise:
 
 		print('\nTrue R: \n{}\n - with optimal policy {}'.format(r[:,0].view(4,1), optimal_policy))
 		print('\nFinal Estimated R after 100 optim steps: \n{}\n - with optimal policy {}\n - avg EVD of {}'.format(finaloutput.view(4,1),thisoptimal_policy, sum(evdList)/len(evdList)))
+		'''
+		return net 
 
 	def linearNN(self, evdThreshold, optim_type):
 		net = LinearNet()
@@ -483,11 +476,45 @@ class minimise:
 		print("\nFound R is \n{}\n with negated likelihood of {}\n and optimal policy {}\n".format(*foundRprintlist))
 
 
-#goal LH this time is: 48711.17683105555
+def testNN(net, X):
+	#build output vector as reward for each state w.r.t its features
+	output = torch.empty(len(X))
+	indexer = 0
+	for f in X:
+		thisR = net(f.view(-1,len(f)))
+		output[indexer] = thisR
+		indexer += 1
+	return output
+
+def getNNpreds(minimise, mynet, num_nets):
+	wb_vals = {}
+	X = torch.Tensor([[0, 0],
+					[1, 0],
+					[2, 0],
+					[3, 0]])
+
+	preds = torch.empty(num_nets, mdp_params['n']**2)
+
+	for i in range(num_nets):
+		mynet = minimise.nonLinearNN(evdThreshold = 0.02, optim_type = 'Adam', net = mynet)
+
+		preds[i] = testNN(mynet, X) #save predicted R from this net
+
+		params = {} #save weights and biases
+		params['fc1'] = {'weight': mynet.fc1.weight, 'bias': mynet.fc1.bias}
+		params['fc2'] = {'weight': mynet.fc1.weight, 'bias': mynet.fc1.bias}
+		wb_vals['net' + str(i)] = params
+
+		for layer in mynet.children(): 	#reset net params
+			if hasattr(layer, 'reset_parameters'):
+					layer.reset_parameters()
+
+	return preds
+
 
 #set mdp params
 mdp_params = {'n':2, 'b':1, 'determinism':1.0, 'discount':0.99, 'seed': 0}
-N = 5000
+N = 2000
 T = 8
 
 print("\n... generating MDP and intial R ... \n")
@@ -505,9 +532,8 @@ r = torch.Tensor(np.array(
 	    [1.   , 1.   , 1.   , 1.   , 1.],
 	    [2.,2.,2.,2.,2.],
 	    [3.  , 3.  ,  3.,   3.,   3.0]], dtype=np.float64))
-42456.262947480514
-
 """
+
 r = torch.Tensor(np.array(
 	[
 		[3.,3.,3.,3.,3.],
@@ -539,42 +565,64 @@ NLL.mdp_data = mdp_data
 
 trueNLL = NLL.apply(r,initD, mu_sa, muE, F, mdp_data) #NLL for true R
 
-#Printline if LH is tensor
-#print("\nTrue R is \n{}\n with negated tensor likelihood of \n{}\n total: {}\n and optimal policy: {}\n".format(r, trueNLL.view(4).detach().numpy(), sum(trueNLL).detach().numpy(), optimal_policy))
-
-#Printline if LH is scalar
-print("\nTrue R is \n{}\n with negated tensor likelihood of \n{}\n and optimal policy: {}\n".format(r, trueNLL, optimal_policy))
-
-
-#find true r
+#'''
 minimise = minimise()
-#minimise.linearNN(evdThreshold = 0.003, optim_type = 'Adam')
-
-minimise.nonLinearNN(evdThreshold = 0.003, optim_type = 'Adam')
-
+mynet = NonLinearNet()
+preds = getNNpreds(minimise = minimise, mynet = mynet, num_nets = 10)
 
 
+'''
+#for testing to avoid running getNNpreds
+preds = torch.Tensor(np.array(
+	[
+		[-2.316e+77, 2.687e+154,  3.000e+00,  3.000e+00],
+        [ 3.000e+00,  6.000e+00,  6.000e+00,  6.000e+00],
+        [ 6.000e+00,  6.000e+00,  5.000e+00,  5.000e+00],
+        [ 5.000e+00,  5.000e+00,  5.000e+00,  2.000e+00],
+        [ 2.000e+00,  2.000e+00,  2.000e+00,  2.000e+00]
+	], dtype=np.float64))
+'''
 
 
+#get each states reward predictions
+state0preds = preds[:, 0]
+state1preds = preds[:, 1]
+state2preds = preds[:, 2]
+state3preds = preds[:, 3]
+predictedRewards = torch.empty(4, dtype=torch.float64)
+predictedRewards[0] = torch.mean(state0preds)
+predictedRewards[1] = torch.mean(state1preds)
+predictedRewards[2] = torch.mean(state2preds)
+predictedRewards[3] = torch.mean(state3preds)
+rewardUncertanties = torch.empty(4)
+rewardUncertanties[0] = torch.var(state0preds)
+rewardUncertanties[1] = torch.var(state1preds)
+rewardUncertanties[2] = torch.var(state2preds)
+rewardUncertanties[3] = torch.var(state3preds)
 
 
+#print("\nTrue R is \n{}\n with negated tensor likelihood of \n{}\n total: {}\n and optimal policy: {}\n".format(r, trueNLL.view(4).detach().numpy(), sum(trueNLL).detach().numpy(), optimal_policy)) #Printline if LH is tensor
+print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r[:, 0], trueNLL, optimal_policy)) #Printline if LH is scalar
+print('NN predicted state 0 has R of {} with an uncertainty of {}'.format(torch.mean(state0preds), torch.var(state0preds)))
+print('NN predicted state 1 has R of {} with an uncertainty of {}'.format(torch.mean(state1preds), torch.var(state1preds)))
+print('NN predicted state 2 has R of {} with an uncertainty of {}'.format(torch.mean(state2preds), torch.var(state2preds)))
+print('NN predicted state 3 has R of {} with an uncertainty of {}'.format(torch.mean(state3preds), torch.var(state3preds)))
 
+#calculate metrics for printing
+v, q, logp, thisp = linearvalueiteration(mdp_data, predictedRewards.view(4,1)) #to get policy under out R
+thisoptimal_policy = np.argmax(thisp.detach().cpu().numpy(), axis=1) 
+estNLL = NLL.apply(predictedRewards,initD, mu_sa, muE, F, mdp_data) #NLL for true R
 
+print('\nNN Estimated R: {}\n- negated likelihood: {}\n- optimal policy {}'.format(predictedRewards, estNLL, thisoptimal_policy))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#plot predicted reward w/ uncertainties
+'''
+f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+ax1.plot(r[:,0].view(4), np.linspace(-10,10,4), xerr=rewardUncertanties, fmt='o', color='black', ecolor='lightgray', elinewidth=3, capsize=0)
+ax1.set_title('True R')
+ax2.errorbar(predictedRewards, np.linspace(-10,10,4), xerr=rewardUncertanties, fmt='o', color='black', ecolor='lightgray', elinewidth=3, capsize=0)
+ax2.set_title('Predicted Rewards')
+plt.errorbar(np.linspace(-10,10,4), predictedRewards, xerr=0.2, yerr=0.4, fmt='o', color='black', ecolor='lightgray', elinewidth=3, capsize=0)
+plt.show()
+'''
 

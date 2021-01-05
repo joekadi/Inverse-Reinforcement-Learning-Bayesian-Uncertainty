@@ -10,11 +10,14 @@ class NonLinearNet(nn.Module):
 		self.fc1.requires_grad=True
 		self.fc2 = nn.Linear(2,1, bias=True)
 		self.fc2.requires_grad=True
-
+	
 	def forward(self, x):
 		x = F.relu(self.fc1(x))
 		x = self.fc2(x)
 		return x
+
+
+
 
 
 

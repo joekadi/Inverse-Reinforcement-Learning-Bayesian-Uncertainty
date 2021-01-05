@@ -136,7 +136,7 @@ class NLLFunction(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        print('Grad output {}'.format(grad_output))
+        #print('Grad output {}'.format(grad_output))
         #Should return as many gradient tesnors w.r.t to inputs
 
         r, initD, mu_sa, muE, F, sa_p, sa_s, states, actions, discount, determinism = ctx.saved_tensors
