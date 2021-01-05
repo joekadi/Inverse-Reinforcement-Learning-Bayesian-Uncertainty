@@ -11,5 +11,6 @@ This is part of my Computing Science Level 5 MSci Project @ Glasgow University w
 ## ToDo
 - Linear IRL w/ Gaussian Process
 - Non-Linear IRL w/ Gaussian Process
+- Bayesian Neural Network using variational weights method
 - Evaluate models on ObjectWorld
 - Evaluate models on hidden state benchmark
