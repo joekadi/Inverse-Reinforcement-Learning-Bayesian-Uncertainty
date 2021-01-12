@@ -19,6 +19,7 @@ from NLLFunction import *
 from myNLL import *
 from likelihood import *
 from gridworld import *
+from objectworld import *
 from linervalueiteration import *
 import pprint
 from sampleexamples import *
@@ -1031,16 +1032,24 @@ def run_single_NN(self, evdThreshold, optim_type, net):
 
         return net
 
+N = 2000 #number of sampled trajectories
+T = 8 #number of actions in each trajectory
 
-# set mdp params
+print("\n ... generating MDP and intial R ... \n")
+#generate mdp and R
 mdp_params = {'n': 2, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
-N = 2000
-T = 8
-
-print("\n... generating MDP and intial R ... \n")
-# generate mdp and R
 mdp_data, r = gridworldbuild(mdp_params)
+
+'''
+mdp_params = {'n': 32, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
+mdp_data = objectworldbuild(mdp_params)
+'''
+
+
 print("... done ...")
+pprint.pprint(mdp_data)
+
+
 
 # set true R equal matlab impl w/ random seed 0
 # not a reward func ... a look up table
@@ -1076,28 +1085,53 @@ NLL.mdp_data = mdp_data
 
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(
-    r[:, 0], trueNLL, optimal_policy))  # Printline if LH is scalar
+print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r[:, 0], trueNLL, optimal_policy))  # Printline if LH is scalar
 
 
 # run single NN
-'''
+"""
 mynet = NonLinearNet()
 single_net = run_single_NN(0.003, "Adam", mynet)
-'''
+"""
 
 # run NN ensemble
 models_to_train = 10  # train this many models
 max_epochs = 3       # for this many epochs
-iters_per_epoch = 25
+iters_per_epoch = 50
 learning_rate = 0.1
 models, model_weights =  run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate)
 
+#get ensemble model predictions
+ensemble_models = []
+for _, row in model_weights.iterrows():
+    # Compute test prediction for this iteration of ensemble weights
+    tmp_y_hat = np.array(
+        [models[model_name] * weight
+            for model_name, weight in row.items()]
+    ).sum(axis=0)
+    ensemble_models.append(tmp_y_hat)
+ensemble_models = pd.Series(ensemble_models)
+
+
+print('for model in ensemble models line')
+for model in ensemble_models:
+    print(model)
+
+
+#print metrics for true R 
+print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}".format(r[:, 0], trueNLL, optimal_policy))  # Printline if LH is scalar
+
+#calculate metrics for final R from ensemble
+v, q, logp, ensemblep = linearvalueiteration(mdp_data, ensemble_models.iloc[-1].view(4, 1))
+ensembleoptimal_policy = np.argmax(ensemblep.detach().cpu().numpy(), axis=1)
+
+#print metrics for final R from ensemble
+print('\nFinal Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(ensemble_models.iloc[-1], ensembleoptimal_policy, NLL.calculate_EVD(truep, ensemble_models.iloc[-1]), NLL.apply(ensemble_models.iloc[-1], initD, mu_sa, muE, F, mdp_data)))
 
 #stack all predicted rewards
-predictions = torch.empty(len(models), mdp_params['n']**2)
+predictions = torch.empty(len(ensemble_models), mdp_params['n']**2)
 i = 0
-for model, predictedR in models.items():
+for predictedR in ensemble_models:
     predictions[i] = predictedR
     i += 1
 
@@ -1108,8 +1142,33 @@ for column in range(predictions.size()[1]):
     average_predictions[column] = torch.mean(predictions[:, column]) #save avg predicted R for each state
     predictions_uncertainty[column] = torch.var(predictions[:, column]) #save variance for each states prediciton as uncertainty
 
-print('Average Predictions: {}'.format(average_predictisons))
-print('Predictions Uncertainty {}'.format(predictions_uncertainty))
+#calculate metrics for avg R from ensemble
+v, q, logp, avgensemblep = linearvalueiteration(mdp_data, average_predictions.view(4, 1))
+avgensembleoptimal_policy = np.argmax(avgensemblep.detach().cpu().numpy(), axis=1)
+print('\nAverage Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(average_predictions, avgensembleoptimal_policy, NLL.calculate_EVD(truep, average_predictions), NLL.apply(average_predictions, initD, mu_sa, muE, F, mdp_data)))
+print('\nPredictions Uncertainty {}'.format(predictions_uncertainty))
+
+
+#plot uncertainty
+x = [1,2,3,4]
+y = ensemble_models.iloc[-1].detach().numpy()
+yerr = predictions_uncertainty.detach().numpy()
+fig, ax = plt.subplots()
+ax.errorbar(x, y,
+            yerr=yerr,
+            fmt='o')
+ax.set_xlabel('State')
+ax.set_ylabel('Predicted R')
+ax.set_title('Predicted R w/ Error Bars')
+plt.show()
+
+
+
+
+
+
+
+
 
 
 

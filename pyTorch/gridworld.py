@@ -11,8 +11,8 @@ def gridworldbuild(mdp_params):
     sa_s = torch.zeros((mdp_params['n']**2,5,5), dtype=torch.int8)
     sa_p = torch.zeros((mdp_params['n']**2,5,5), dtype=torch.int8)
     for y in range(mdp_params['n']):
-        for x in range(mdp_params['n']):
-            
+        for x in range(mdp_params['n']):    
+                   
             s = y*mdp_params['n']+x
             successors = torch.zeros((1,1,5))
             successors[0,0,0] = s
