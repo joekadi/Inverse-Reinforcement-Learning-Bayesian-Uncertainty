@@ -8,29 +8,28 @@ torch.set_printoptions(precision=5)
 
 def objectworldbuild(mdp_params):
 
-
-
     '''
-    % mdp_params - parameters of the objectworld:
-    %       seed (0) - initialization for random seed
-    %       n (32) - number of cells along each axis
-    %       placement_prob (0.05) - probability of placing object in each cell
-    %       c1 (2) - number of primary "colors"
-    %       c2 (2) - number of secondary "colors"
-    %       determinism (1.0) - probability of correct transition
-    %       discount (0.9) - temporal discount factor to use
-    % mdp_data - standard MDP definition structure with object-world details:
-    %       states - total number of states in the MDP
-    %       actions - total number of actions in the MDP
-    %       discount - temporal discount factor to use
-    %       sa_s - mapping from state-action pairs to states
-    %       sa_p - mapping from state-action pairs to transition probabilities
-    %       map1 - mapping from states to c1 colors
-    %       map2 - mapping from states to c2 colors
-    %       c1array - array of locations by c1 colors
-    %       c2array - array of locations by c2 colors
-    % r - mapping from state-action pairs to rewards
+    mdp_params - parameters of the objectworld:
+    seed (0) - initialization for random seed
+    n (32) - number of cells along each axis
+    placement_prob (0.05) - probability of placing object in each cell
+    c1 (2) - number of primary "colors"
+    c2 (2) - number of secondary "colors"
+    determinism (1.0) - probability of correct transition
+    discount (0.9) - temporal discount factor to use
+    mdp_data - standard MDP definition structure with object-world details:
+    states - total number of states in the MDP
+    actions - total number of actions in the MDP
+    discount - temporal discount factor to use
+    sa_s - mapping from state-action pairs to states
+    sa_p - mapping from state-action pairs to transition probabilities
+    map1 - mapping from states to c1 colors
+    map2 - mapping from states to c2 colors
+    c1array - array of locations by c1 colors
+    c2array - array of locations by c2 colors
+    r - mapping from state-action pairs to rewards
     '''
+
     #Construct the Gridworld MDP structures. 
     torch.manual_seed(mdp_params['seed'])
     np.random.seed(seed=mdp_params['seed'])
@@ -63,10 +62,7 @@ def objectworldbuild(mdp_params):
         c1array.append([])
         c2array.append([])
 
-    '''
-    c1array = np.empty([int(mdp_params['c1']), 1])
-    c2array = np.empty([int(mdp_params['c1']), 1])
-    '''
+
     '''
     Place objects in "rounds", with 2 colors each round.
     This ensures, for example, that increasing c1 from 2 to 4 results in all
@@ -106,20 +102,8 @@ def objectworldbuild(mdp_params):
                 c1inserter.append([s]) 
                 c2inserter.append([s]) 
                 
-                '''
-                #make copies then append new state
-                #for np.arrays
-                c1inserter = c1array[c1] 
-                c2inserter = c2array[c2] 
-                np.append(c1inserter, [s]) 
-                np.append(c2inserter, [s]) 
-                '''
-
-
-                #update lists
                 c1array[c1] = c1inserter 
                 c2array[c2] = c2inserter
-
 
     #convert into list of column vectors
     for arr in c1array:
@@ -147,12 +131,19 @@ def objectworldbuild(mdp_params):
                 'c1array':c1array,
                 'c2array':c2array}
 
-    objectworldfeatures(mdp_params, mdp_data)
+    r, feature_data, true_feature_map = objectworldfeatures(mdp_params, mdp_data)
 
-    return mdp_data
+    return mdp_data, r, feature_data, true_feature_map
 
 def objectworldfeatures(mdp_params, mdp_data):
 
+    '''
+    mdp_params - definition of MDP domain
+    mdp_data - generic definition of domain
+    feature_data - generic feature data:
+    splittable - matrix of states to features
+    stateadjacency - sparse state adjacency matrix
+    '''
     
     #Construct adjacency table.
     indptr = np.zeros((int(mdp_data['states'])+1))
@@ -205,8 +196,63 @@ def objectworldfeatures(mdp_params, mdp_data):
 
         #Build corresponding feature table (continuous).
         splittablecont[s,torch.arange(0,int(mdp_params['c1']))] = c1dsq.view(len(c1dsq))
-        
-        #I AM HERE
-        splittablecont[s,int(mdp_params['c1'])+1:int(mdp_params['c1'])+int(mdp_params['c2'])] = c2dsq
+        splittablecont[s, torch.arange(int(mdp_params['c1']),int(mdp_params['c1'])+int(mdp_params['c2']))] = c2dsq.view(len(c2dsq))
+    
+    #Return feature data structure.
+    feature_data = {
+        'stateadjacency': stateadjacency,
+        'splittable': splittable
+    }
 
+    #If continuous flag True, replace splittable
+    if mdp_params['continuous']:
+        feature_data['splittable'] = splittablecont
+
+    #Construct true feature map.
+    
+    fm_indptr = np.zeros((int(mdp_params['r_tree']['total_leaves']+1)))
+    true_feature_map = sps.csc_matrix(([], [], fm_indptr), shape=(int(mdp_data['states']),  int(mdp_params['r_tree']['total_leaves'])))
+    for s in range(int(mdp_data['states'])):
+        #Determine which leaf state belongs to
+        leaf, val = cartcheckleaf(mdp_params['r_tree'],s,feature_data)
+        true_feature_map[s,leaf] = 1
+    #Fill in the reward function.
+    R_SCALE = 5
+    r = cartaverage(mdp_params.r_tree,feature_data)*R_SCALE
+
+    return r, feature_data, true_feature_map
+
+def cartcheckleaf(tree, s, feature_data):
+    #Check which leaf of tree contains leaf.
+
+    #Check if this is a leaf.
+    if (tree['type'] == 0):
+        #Return result.
+        leaf = tree['index']
+        val = tree['mean']
+    else:
+        #Recurse.
+        if feature_data['splittable'][s,int(tree['test'])] == 0:
+            branch = tree['ltTree']
+        else:
+            branch = tree['gtTree']
+        leaf, val = cartcheckleaf(branch, s, feature_data)
+    
+    return leaf, val
+
+def cartaverage(tree,feature_data):
+    #Return average reward for given regression tree
+    if (tree['type'] == 0):
+        #Simply return the average.
+        R = torch.tile(tree['mean'], (feature_data['splittable'].shape[0], 1))
+    else:
+        #Compute reward on each side.
+        ltR = cartaverage(tree['ltTree'],feature_data)
+        gtR = cartaverage(tree['gtTree'],feature_data)
+
+    #Combine.
+    ind = torch.tile(feature_data['splittable'][:, tree['test']], (1, ltR.shape[1]))
+    R = (1-ind)*ltR + ind*gtR
+    
+    return R
 
