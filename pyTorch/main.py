@@ -1037,20 +1037,20 @@ T = 8 #number of actions in each trajectory
 
 print("\n ... generating MDP and intial R ... \n")
 #generate mdp and R
+'''
 mdp_params = {'n': 2, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
 mdp_data, r = gridworldbuild(mdp_params)
-
 '''
-mdp_params = {'n': 32, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
+
+
+mdp_params = {'n': 10, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
 mdp_data = objectworldbuild(mdp_params)
-'''
-
 
 print("... done ...")
-pprint.pprint(mdp_data)
 
 
 
+"""
 # set true R equal matlab impl w/ random seed 0
 # not a reward func ... a look up table
 r = torch.Tensor(np.array(
@@ -1089,10 +1089,10 @@ print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(
 
 
 # run single NN
-"""
+'''
 mynet = NonLinearNet()
 single_net = run_single_NN(0.003, "Adam", mynet)
-"""
+'''
 
 # run NN ensemble
 models_to_train = 10  # train this many models
@@ -1164,7 +1164,7 @@ plt.show()
 
 
 
-
+"""
 
 
 

@@ -5,6 +5,7 @@ import torch
 from torch.autograd import Variable
 import torch.nn as nn
 from gridworld import *
+from scipy import sparse as sps
 torch.set_printoptions(precision=3)
 
 class NLLFunction(torch.autograd.Function):
