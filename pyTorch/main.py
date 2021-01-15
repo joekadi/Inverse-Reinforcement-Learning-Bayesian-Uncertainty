@@ -1042,18 +1042,21 @@ mdp_params = {'n': 2, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
 mdp_data, r = gridworldbuild(mdp_params)
 '''
 
+#r_tree = struct('type',1,'test',1+step*2,'total_leaves',3,'ltTree',struct('type',0,'index',1,'mean',[0,0,0,0,0]),'gtTree',struct('type',1,'test',2+step*1,'total_leaves',2,'gtTree',struct('type',0,'index',2,'mean',[1 1 1 1 1]),'ltTree',struct('type',0,'index',3,'mean',[-2 -2 -2 -2 -2])));  
 
-mdp_params = {'n': 10, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.99, 'seed': 0, 'r_tree': None}
+mdp_params = {'n': 32, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.99, 'seed': 0, 'r_tree': None}
 step = mdp_params['c1'] + mdp_params['c2']
 r_tree = {'type': 1, 'test':1+step*2, 'total_leaves':3,           # Test distance to c1 1 shape
-    'ltTree':{'type':0, 'index': 1,'mean':[0,0,0,0,0]},           # Neutral reward for being elsewhere
+    'ltTree':{'type':0, 'index': 0,'mean':[0,0,0,0,0]},           # Neutral reward for being elsewhere
     'gtTree': {'type':1,'test':2+step*1,'total_leaves':2,         # Test distance to c1 2 shape
-        'gtTree':{'type':0, 'index':2,'mean':[1,1,1,1,1]},        # Reward for being close
-        'ltTree':{'type':0,'index':3,'mean':[-2,-2,-2,-2,-2]}}}   # Penalty otherwise
+        'gtTree':{'type':0, 'index':1,'mean':[1,1,1,1,1]},        # Reward for being close
+        'ltTree':{'type':0,'index':2,'mean':[-2,-2,-2,-2,-2]}}}   # Penalty otherwise
 mdp_params['r_tree'] = r_tree
 mdp_data, r, feature_data, true_feature_map = objectworldbuild(mdp_params)
 
 print("... done ...")
+
+print(r)
 
 
 

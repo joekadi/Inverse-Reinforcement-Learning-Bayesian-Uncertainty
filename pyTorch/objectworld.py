@@ -1,4 +1,4 @@
-import torch
+import torch as torch
 import numpy as np
 import math as math
 import random
@@ -7,7 +7,7 @@ from scipy import sparse as sps
 torch.set_printoptions(precision=5)
 
 def objectworldbuild(mdp_params):
-
+    
     '''
     mdp_params - parameters of the objectworld:
     seed (0) - initialization for random seed
@@ -218,7 +218,7 @@ def objectworldfeatures(mdp_params, mdp_data):
         true_feature_map[s,leaf] = 1
     #Fill in the reward function.
     R_SCALE = 5
-    r = cartaverage(mdp_params.r_tree,feature_data)*R_SCALE
+    r = cartaverage(mdp_params['r_tree'],feature_data)*R_SCALE
 
     return r, feature_data, true_feature_map
 
@@ -244,15 +244,21 @@ def cartaverage(tree,feature_data):
     #Return average reward for given regression tree
     if (tree['type'] == 0):
         #Simply return the average.
-        R = torch.tile(tree['mean'], (feature_data['splittable'].shape[0], 1))
+        R = np.tile(tree['mean'], (feature_data['splittable'].shape[0], 1))
+        R = torch.tensor(R)
+        return R
+        
     else:
         #Compute reward on each side.
         ltR = cartaverage(tree['ltTree'],feature_data)
         gtR = cartaverage(tree['gtTree'],feature_data)
 
     #Combine.
-    ind = torch.tile(feature_data['splittable'][:, tree['test']], (1, ltR.shape[1]))
-    R = (1-ind)*ltR + ind*gtR
+    ind = np.tile(feature_data['splittable'][:, int(tree['test'])], (1, ltR.shape[1]))
+    ind = np.reshape(ind, ltR.size())
+    ind = torch.tensor(ind)
+    hold= (1-ind)*ltR 
+    R = hold + ind*gtR
     
     return R
 
