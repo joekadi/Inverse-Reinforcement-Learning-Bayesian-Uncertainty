@@ -53,7 +53,7 @@ class NLLFunction(torch.autograd.Function):
         
         
         #Compute feature expectations.
-        F = torch.eye(mdp_data['states'], dtype=torch.float64)
+        F = torch.eye(int(mdp_data['states']), dtype=torch.float64)
         features = F.shape[2-1]
         #print('Features {}'.format(self.F))
 
@@ -62,14 +62,14 @@ class NLLFunction(torch.autograd.Function):
         muE = torch.zeros((features,1), dtype=torch.float64)
 
 
-        mu_sa = torch.zeros((mdp_data['states'],mdp_data['actions']))
+        mu_sa = torch.zeros((int(mdp_data['states']),int(mdp_data['actions'])))
 
         for i in range(N):
             for t in range(T):
                 ex_s[i,t] = example_samples[i][t][0]
                 ex_a[i,t] = example_samples[i][t][1]
                 mu_sa[int(ex_s[i,t]),int(ex_a[i,t])] = mu_sa[int(ex_s[i,t]),int(ex_a[i,t])] + 1.0 #maybe minus 1 since numpy index -1 to matlab
-                state_vec = torch.zeros((mdp_data['states'],1), dtype=torch.float64)
+                state_vec = torch.zeros((int(mdp_data['states']),1), dtype=torch.float64)
                 state_vec[int(ex_s[i,t])] = 1.0
                 muE = muE + torch.matmul(torch.t(F),state_vec)
                             
@@ -81,7 +81,7 @@ class NLLFunction(torch.autograd.Function):
         ones = torch.ones((N*T,1))
      
         #Generate initial state distribution for infinite horizon.
-        initD_CSR = sps.csc_matrix((Rones, ex_s_reshaped, po), shape=(mdp_data['states'],T*N))
+        initD_CSR = sps.csc_matrix((Rones, ex_s_reshaped, po), shape=(int(mdp_data['states']),T*N))
         initD_CSR.eliminate_zeros() 
         initD_mx = torch.matmul(torch.tensor(initD_CSR.todense()), ones)
         initD = torch.sum(initD_mx,1)
@@ -100,8 +100,8 @@ class NLLFunction(torch.autograd.Function):
         print('F \n{}\n'.format(self.F))
         print('Features \n{}\n'.format(features))
         '''
-        self.initD = torch.reshape(initD, (mdp_data['states'],1))
-        initD = torch.reshape(initD, (mdp_data['states'],1)) 
+        self.initD = torch.reshape(initD, (int(mdp_data['states']),1))
+        initD = torch.reshape(initD, (int(mdp_data['states']),1)) 
 
         self.mu_sa = mu_sa
         self.muE = muE
@@ -119,7 +119,7 @@ class NLLFunction(torch.autograd.Function):
             r = torch.tensor(r) #cast to tensor
         if(r.shape != (mdp_data['states'],5)):
             #reformat to be in shape (states,actions)
-            r = torch.reshape(r, (mdp_data['states'],1))
+            r = torch.reshape(r, (int(mdp_data['states']),1))
             r = r.repeat((1, 5))
 
         #Solve MDP with current reward
@@ -157,7 +157,7 @@ class NLLFunction(torch.autograd.Function):
             r = torch.tensor(r) #cast to tensor
         if(r.shape != (mdp_data['states'],5)):
             #reformat to be in shape (states,actions)
-            r = torch.reshape(r, (mdp_data['states'],1))
+            r = torch.reshape(r, (int(mdp_data['states']),1))
             r = r.repeat((1, 5))
 
         #Solve MDP with current reward
@@ -173,7 +173,7 @@ class NLLFunction(torch.autograd.Function):
         return -dr, None, None, None, None, None #+dr, return -dr for descent 
 
     def calculate_EVD(self, trueP, currR):
-        v, q, logp, currP = linearvalueiteration(self.mdp_data, currR.view(self.mdp_data['states'],1))
+        v, q, logp, currP = linearvalueiteration(self.mdp_data, currR.view(int(self.mdp_data['states']),1))
         #Expected Value Diff = diff in policies since exact True R values never actually learned, only it's structure
         evd=torch.max(torch.abs(currP-trueP))
         return evd

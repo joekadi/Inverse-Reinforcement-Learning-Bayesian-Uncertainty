@@ -14,7 +14,7 @@ def maxentsoftmax(q):
     return v
 
 def linearvalueiteration(mdp_data, r):
-    v = torch.zeros((mdp_data['states'], 1), dtype=float)
+    v = torch.zeros((int(mdp_data['states']), 1), dtype=float)
     sa_s = copy.copy(mdp_data['sa_s'])
     sa_s = sa_s.type(torch.float64)
     diff = 1.0
@@ -23,12 +23,18 @@ def linearvalueiteration(mdp_data, r):
         count +=1 
         vp = copy.copy(v)
 
-        # q = r + mdp_data.discount*sum(mdp_data.sa_p.*vp(mdp_data.sa_s),3);
-       
+        
         for i in range(len(vp)): 
-            sa_s[mdp_data['sa_s'] == i] = vp[i] #vp(mdp_data.sa_s)
-
+            sa_s_indexer = (mdp_data['sa_s'].type(torch.LongTensor)== float(i)).type(torch.LongTensor)
+            #ensure no value in sa_s_indexer is greater than max no. of states i.e the length of dim 0 in sa_s
+            sa_s_indexer[sa_s_indexer > sa_s.size()[0]-1 ] = sa_s.size()[0]-1
+            sa_s[sa_s_indexer]   = vp[i] #vp(mdp_data.sa_s)
+        
+        #print('sa_s', sa_s.size())
+        
         q = r + mdp_data['discount']* torch.sum(mdp_data['sa_p']*sa_s, 2)
+        #q = r + mdp_data['discount']* torch.sum(mdp_data['sa_p']*vp[mdp_data['sa_s'].type(torch.LongTensor)], 2)
+
         v = maxentsoftmax(q)
 
         diff = max(abs(v-vp))
@@ -36,7 +42,7 @@ def linearvalueiteration(mdp_data, r):
 
 
     #compute policy
-    logp = q - v.repeat([1,mdp_data['actions']])
+    logp = q - v.repeat([1,int(mdp_data['actions'])])
     p = torch.exp(logp)
 
     return v, q, logp, p

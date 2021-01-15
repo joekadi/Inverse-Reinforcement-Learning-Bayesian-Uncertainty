@@ -897,7 +897,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate)
 
     return y_hats_test, model_weights
 
-def run_single_NN(self, evdThreshold, optim_type, net):
+def run_single_NN(evdThreshold, optim_type, net, X):
 
         #net = NonLinearNet()
         tester = testers()
@@ -907,11 +907,17 @@ def run_single_NN(self, evdThreshold, optim_type, net):
         # bias = false on weight params seems to work when inital R is 0
         # check gradients with torch.gradcheck
 
+        '''
         X = torch.Tensor([[0, 0],
                           [1, 0],
                           [2, 0],
                           [3, 0]
                           ])  # for NN(state feature vector) = reward
+
+
+        '''
+
+        print(X.size())
 
         evd = 10
         lr = 0.1
@@ -953,9 +959,9 @@ def run_single_NN(self, evdThreshold, optim_type, net):
                 # Printline when LH is vector
                 #print('{}: output: {} | EVD: {} | loss: {} | {}'.format(i, output.detach().numpy(), evd,loss.detach().numpy(), sum(loss).detach().numpy()))
                 # Printline when LH scalar
-                print('{}: output: {} | EVD: {} | loss: {} '.format(
-                    i, output.detach().numpy(), evd, loss.detach().numpy()))
+                #print('{}: output: {} | EVD: {} | loss: {} '.format(i, output.detach().numpy(), evd, loss.detach().numpy()))
 
+                print('{}: | EVD: {} | loss: {} '.format(i, evd, loss.detach().numpy()))
                 # store metrics for printing
                 NLList.append(loss.item())
                 iterations.append(i)
@@ -1032,10 +1038,10 @@ def run_single_NN(self, evdThreshold, optim_type, net):
 
         return net
 
-N = 2000 #number of sampled trajectories
+N = 16 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
 
-print("\n ... generating MDP and intial R ... \n")
+print("\n ... generating MDP and intial R ...")
 #generate mdp and R
 '''
 mdp_params = {'n': 2, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
@@ -1044,7 +1050,7 @@ mdp_data, r = gridworldbuild(mdp_params)
 
 #r_tree = struct('type',1,'test',1+step*2,'total_leaves',3,'ltTree',struct('type',0,'index',1,'mean',[0,0,0,0,0]),'gtTree',struct('type',1,'test',2+step*1,'total_leaves',2,'gtTree',struct('type',0,'index',2,'mean',[1 1 1 1 1]),'ltTree',struct('type',0,'index',3,'mean',[-2 -2 -2 -2 -2])));  
 
-mdp_params = {'n': 32, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.99, 'seed': 0, 'r_tree': None}
+mdp_params = {'n': 10, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.99, 'seed': 0, 'r_tree': None}
 step = mdp_params['c1'] + mdp_params['c2']
 r_tree = {'type': 1, 'test':1+step*2, 'total_leaves':3,           # Test distance to c1 1 shape
     'ltTree':{'type':0, 'index': 0,'mean':[0,0,0,0,0]},           # Neutral reward for being elsewhere
@@ -1054,10 +1060,40 @@ r_tree = {'type': 1, 'test':1+step*2, 'total_leaves':3,           # Test distanc
 mdp_params['r_tree'] = r_tree
 mdp_data, r, feature_data, true_feature_map = objectworldbuild(mdp_params)
 
+print("\n... done ...")
+
+
+# Solve MDP
+print("\n... performing value iteration for v, q, logp and truep ...")
+v, q, logp, truep = linearvalueiteration(mdp_data, r)
+mdp_solution = {'v': v, 'q': q, 'p': truep, 'logp': logp}
+optimal_policy = np.argmax(truep.detach().cpu().numpy(), axis=1)
 print("... done ...")
 
-print(r)
+# Sample paths
+print("\n... sampling paths from true R ... \n")
+example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
+print("... done ...\n")
 
+
+NLL = NLLFunction()  # initialise NLL
+initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples)  # calculate required variables
+
+# assign constant class variable
+NLL.F = F
+NLL.muE = muE
+NLL.mu_sa = mu_sa
+NLL.initD = initD
+NLL.mdp_data = mdp_data
+
+trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
+
+print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r[:, 0], trueNLL, optimal_policy))  # Printline if LH is scalar
+
+# run single NN
+
+mynet = NonLinearNet()
+single_net = run_single_NN(0.003, "Adam", mynet, feature_data['splittable'])
 
 
 """

@@ -27,7 +27,7 @@ def step(mdp_data, s, action):
 def optimal_action(mdp_data, mdp_solution, s):
     samp = random.uniform(0, 1)
     total = 0
-    for a in range(mdp_data['actions']):
+    for a in range(int(mdp_data['actions'])):
         total = total+mdp_solution['p'][s,a]
         if total >= samp:
             return a
@@ -51,7 +51,11 @@ def sampleexamples(N,T, mdp_solution, mdp_data):
             staterow = mdp_solution['q'][s,:]
             action = optimal_action(mdp_data, mdp_solution, s)
             #store sample
-            path[t] = (s,action)
+            if(torch.is_tensor(s)):
+                path[t] = (s.item(),action)
+            else:
+                path[t] = (s,action)
+                
             #next_state
             s = step(mdp_data, s, action)
         example_samples[i] = path
