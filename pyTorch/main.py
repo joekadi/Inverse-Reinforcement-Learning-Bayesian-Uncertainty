@@ -918,7 +918,7 @@ def run_single_NN(evdThreshold, optim_type, net, X):
 
 
         evd = 10
-        lr = 0.1
+        lr = 0.5
         finaloutput = None
 
         # lists for printing
@@ -950,7 +950,7 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                 output = torch.empty(len(X[0]), 1)
                 indexer = 0
                 for j in range(len(X[0])):
-                    thisR = net(X[j].view(-1, len(X[j])))
+                    thisR = net(X[:, j].view(-1, len(X[:, j])))
                     output[indexer] = thisR
                     indexer += 1
 
