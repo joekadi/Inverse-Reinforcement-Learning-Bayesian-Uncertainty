@@ -20,7 +20,7 @@ from myNLL import *
 from likelihood import *
 from gridworld import *
 from objectworld import *
-from linervalueiteration import *
+from linearvalueiteration import *
 import pprint
 from sampleexamples import *
 import numpy as np
@@ -914,10 +914,8 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                           [3, 0]
                           ])  # for NN(state feature vector) = reward
 
-
         '''
 
-        print(X.size())
 
         evd = 10
         lr = 0.1
@@ -938,6 +936,7 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                 # for i in range(50):
                 net.zero_grad()
 
+                '''
                 # build output vector as reward for each state w.r.t its features
                 output = torch.empty(len(X))
                 indexer = 0
@@ -945,6 +944,17 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                     thisR = net(f.view(-1, len(f)))
                     output[indexer] = thisR
                     indexer += 1
+                '''
+
+                #new way on creating R size [features,1] - inline with matlab
+                output = torch.empty(len(X[0]), 1)
+                indexer = 0
+                for j in range(len(X[0])):
+                    thisR = net(X[j].view(-1, len(X[j])))
+                    output[indexer] = thisR
+                    indexer += 1
+
+            
 
                 # get loss from curr output
                 loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data)
@@ -953,7 +963,7 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                 #print('Output {} with grad fn {}'.format(output, output.grad_fn))
                 #print('Loss {} with grad fn {}'.format(loss, loss.grad_fn))
                 loss.backward()  # propagate grad through network
-                evd = NLL.calculate_EVD(truep, output)  # calc EVD
+                evd = NLL.calculate_EVD(truep, torch.matmul(X, output))  # calc EVD
                 optimizer.step()
 
                 # Printline when LH is vector
@@ -978,13 +988,14 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                 net.zero_grad()
 
                 # build output vector as reward for each state w.r.t its features
-                output = torch.empty(len(X))
+                output = torch.empty(len(X[0]))
                 indexer = 0
-                for f in X:
+                for f in X[0]:
                     thisR = net(f.view(-1, len(f)))
                     output[indexer] = thisR
                     indexer += 1
 
+                
                 # get loss from curr output
                 loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data)
 
@@ -1038,7 +1049,7 @@ def run_single_NN(evdThreshold, optim_type, net, X):
 
         return net
 
-N = 16 #number of sampled trajectories
+N = 3000 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
 
 print("\n ... generating MDP and intial R ...")
@@ -1062,22 +1073,21 @@ mdp_data, r, feature_data, true_feature_map = objectworldbuild(mdp_params)
 
 print("\n... done ...")
 
-
 # Solve MDP
 print("\n... performing value iteration for v, q, logp and truep ...")
 v, q, logp, truep = linearvalueiteration(mdp_data, r)
 mdp_solution = {'v': v, 'q': q, 'p': truep, 'logp': logp}
 optimal_policy = np.argmax(truep.detach().cpu().numpy(), axis=1)
-print("... done ...")
+print("\n... done ...")
 
 # Sample paths
 print("\n... sampling paths from true R ... \n")
 example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
-print("... done ...\n")
+print("\n... done ...")
 
 
 NLL = NLLFunction()  # initialise NLL
-initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples)  # calculate required variables
+initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples, feature_data)  # calculate required variables
 
 # assign constant class variable
 NLL.F = F
@@ -1088,12 +1098,90 @@ NLL.mdp_data = mdp_data
 
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r[:, 0], trueNLL, optimal_policy))  # Printline if LH is scalar
+print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r, trueNLL, optimal_policy))  # Printline if LH is scalar
 
 # run single NN
-
 mynet = NonLinearNet()
 single_net = run_single_NN(0.003, "Adam", mynet, feature_data['splittable'])
+
+
+'''
+# run NN ensemble
+models_to_train = 10  # train this many models
+max_epochs = 3       # for this many epochs
+iters_per_epoch = 50
+learning_rate = 0.1
+models, model_weights =  run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate)
+
+#get ensemble model predictions
+ensemble_models = []
+for _, row in model_weights.iterrows():
+    # Compute test prediction for this iteration of ensemble weights
+    tmp_y_hat = np.array(
+        [models[model_name] * weight
+            for model_name, weight in row.items()]
+    ).sum(axis=0)
+    ensemble_models.append(tmp_y_hat)
+ensemble_models = pd.Series(ensemble_models)
+
+
+print('for model in ensemble models line')
+for model in ensemble_models:
+    print(model)
+
+
+#print metrics for true R 
+print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}".format(r[:, 0], trueNLL, optimal_policy))  # Printline if LH is scalar
+
+#calculate metrics for final R from ensemble
+v, q, logp, ensemblep = linearvalueiteration(mdp_data, ensemble_models.iloc[-1].view(4, 1))
+ensembleoptimal_policy = np.argmax(ensemblep.detach().cpu().numpy(), axis=1)
+
+#print metrics for final R from ensemble
+print('\nFinal Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(ensemble_models.iloc[-1], ensembleoptimal_policy, NLL.calculate_EVD(truep, ensemble_models.iloc[-1]), NLL.apply(ensemble_models.iloc[-1], initD, mu_sa, muE, F, mdp_data)))
+
+#stack all predicted rewards
+predictions = torch.empty(len(ensemble_models), mdp_params['n']**2)
+i = 0
+for predictedR in ensemble_models:
+    predictions[i] = predictedR
+    i += 1
+
+#get average predicted reward and uncertainty of all models
+average_predictions = torch.empty(mdp_params['n']**2)
+predictions_uncertainty = torch.empty(mdp_params['n']**2)
+for column in range(predictions.size()[1]):
+    average_predictions[column] = torch.mean(predictions[:, column]) #save avg predicted R for each state
+    predictions_uncertainty[column] = torch.var(predictions[:, column]) #save variance for each states prediciton as uncertainty
+
+#calculate metrics for avg R from ensemble
+v, q, logp, avgensemblep = linearvalueiteration(mdp_data, average_predictions.view(4, 1))
+avgensembleoptimal_policy = np.argmax(avgensemblep.detach().cpu().numpy(), axis=1)
+print('\nAverage Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(average_predictions, avgensembleoptimal_policy, NLL.calculate_EVD(truep, average_predictions), NLL.apply(average_predictions, initD, mu_sa, muE, F, mdp_data)))
+print('\nPredictions Uncertainty {}'.format(predictions_uncertainty))
+
+
+#plot uncertainty
+x = [1,2,3,4]
+y = ensemble_models.iloc[-1].detach().numpy()
+yerr = predictions_uncertainty.detach().numpy()
+fig, ax = plt.subplots()
+ax.errorbar(x, y,
+            yerr=yerr,
+            fmt='o')
+ax.set_xlabel('State')
+ax.set_ylabel('Predicted R')
+ax.set_title('Predicted R w/ Error Bars')
+plt.show()
+
+
+
+'''
+
+
+
+
+
 
 
 """

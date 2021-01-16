@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sps
-from linervalueiteration import *
+from linearvalueiteration import *
 from linearmdpfrequency import *
 import torch
 from torch.autograd import Variable

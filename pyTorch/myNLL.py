@@ -1,5 +1,5 @@
 import numpy as np
-from linervalueiteration import *
+from linearvalueiteration import *
 from linearmdpfrequency import *
 import torch
 from torch.autograd import Variable

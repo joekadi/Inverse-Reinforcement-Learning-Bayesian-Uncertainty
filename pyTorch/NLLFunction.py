@@ -1,5 +1,5 @@
 import numpy as np
-from linervalueiteration import *
+from linearvalueiteration import *
 from linearmdpfrequency import *
 import torch
 from torch.autograd import Variable
@@ -19,7 +19,7 @@ class NLLFunction(torch.autograd.Function):
     initD = None
     p = None
 
-    def calc_var_values(self, mdp_data, N, T, example_samples):
+    def calc_var_values(self, mdp_data, N, T, example_samples, feature_data):
         mdp_data = mdp_data
         N = N
         T = T
@@ -53,7 +53,7 @@ class NLLFunction(torch.autograd.Function):
         
         
         #Compute feature expectations.
-        F = torch.eye(int(mdp_data['states']), dtype=torch.float64)
+        F = feature_data['splittable']
         features = F.shape[2-1]
         #print('Features {}'.format(self.F))
 
@@ -115,24 +115,37 @@ class NLLFunction(torch.autograd.Function):
         #Returns NLL w.r.t input r
 
         ctx.save_for_backward(r, initD, mu_sa, muE, F, mdp_data['sa_p'], mdp_data['sa_s'], torch.tensor(mdp_data['states']), torch.tensor(mdp_data['actions']), torch.tensor(mdp_data['discount']), torch.tensor(mdp_data['determinism']))
+        '''
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r) #cast to tensor
         if(r.shape != (mdp_data['states'],5)):
             #reformat to be in shape (states,actions)
             r = torch.reshape(r, (int(mdp_data['states']),1))
             r = r.repeat((1, 5))
+        '''
+
+
+        if(torch.is_tensor(r) == False):
+            r = torch.tensor(r) #cast to tensor
+        if(r.shape != (mdp_data['states'],5)):
+            #convert to full reward
+            r = torch.matmul(F, r)
+
 
         #Solve MDP with current reward
         v, q, logp, p = linearvalueiteration(mdp_data, r) 
    
         #Calculate likelihood from logp
         likelihood = torch.empty(mu_sa.shape, requires_grad=True)
+
+
         likelihood = torch.sum(torch.sum(logp*mu_sa)) #for scalar likelihood
 
         #LH for each state as tensor size (states,1)
         #mul = logp*mu_sa #hold
         #likelihood = torch.sum(mul, dim=1)
         #likelihood.requires_grad = True
+        
         return -likelihood
 
     @staticmethod
@@ -152,13 +165,21 @@ class NLLFunction(torch.autograd.Function):
             'sa_p':sa_p
             }
 
-
+        '''
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r) #cast to tensor
         if(r.shape != (mdp_data['states'],5)):
             #reformat to be in shape (states,actions)
             r = torch.reshape(r, (int(mdp_data['states']),1))
             r = r.repeat((1, 5))
+        '''
+
+        if(torch.is_tensor(r) == False):
+            r = torch.tensor(r) #cast to tensor
+        if(r.shape != (mdp_data['states'],5)):
+            #convert to full reward
+            r = torch.matmul(F, r)
+
 
         #Solve MDP with current reward
         v, q, logp, p = linearvalueiteration(mdp_data, r) 
@@ -169,10 +190,15 @@ class NLLFunction(torch.autograd.Function):
         D = linearmdpfrequency(mdp_data,p.detach().cpu().numpy(),initD.detach().cpu().numpy())#Compute state visitation count D
         D = torch.tensor(D) #Cast to tensor
         dr = muE - torch.matmul(torch.t(F),D) #Compute gradient
-        dr = dr.view(len(dr)) #Make row vector
+
+        #dr = dr.repeat((1, 5)) #make shape [states, 5]
+
+        #dr = dr.view(len(dr)) #Make row vector
+        
         return -dr, None, None, None, None, None #+dr, return -dr for descent 
 
     def calculate_EVD(self, trueP, currR):
+
         v, q, logp, currP = linearvalueiteration(self.mdp_data, currR.view(int(self.mdp_data['states']),1))
         #Expected Value Diff = diff in policies since exact True R values never actually learned, only it's structure
         evd=torch.max(torch.abs(currP-trueP))
