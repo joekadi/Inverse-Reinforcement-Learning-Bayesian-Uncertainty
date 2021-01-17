@@ -188,7 +188,7 @@ class NLLFunction(torch.autograd.Function):
         #Calc gradient w.r.t to forward inputs 
         D = grad_output.clone()
         D = linearmdpfrequency(mdp_data,p.detach().cpu().numpy(),initD.detach().cpu().numpy())#Compute state visitation count D
-        D = torch.tensor(D) #Cast to tensor
+        D = torch.tensor(D.clone().detach().requires_grad_(True)) #Cast to tensor
         dr = muE - torch.matmul(torch.t(F),D) #Compute gradient
 
         #dr = dr.repeat((1, 5)) #make shape [states, 5]

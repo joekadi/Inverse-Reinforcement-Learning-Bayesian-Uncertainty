@@ -491,7 +491,7 @@ def variationalweightsBNN(r, X, net):
 
     # insert code to test how accurate BNN is i.e make predictions. last section of code from https://towardsdatascience.com/making-your-neural-network-say-i-dont-know-bayesian-nns-using-pyro-and-pytorch-b1c24e6ab8cd
 
-def ensemble_selector(loss_function, optim_for_loss, y_hats, init_size=1,
+def ensemble_selector(loss_function, optim_for_loss, y_hats, X, init_size=1,
                       replacement=True, max_iter=100):
     """Implementation of the algorithm of Caruana et al. (2004) 'Ensemble
     Selection from Libraries of Models'. Given a loss function mapping
@@ -536,7 +536,7 @@ def ensemble_selector(loss_function, optim_for_loss, y_hats, init_size=1,
             losses[model] = loss_function.apply(
                 y_hat, initD, mu_sa, muE, F, mdp_data)
         else:
-            losses[model] = loss_function.calculate_EVD(truep, y_hat).item()
+            losses[model] = loss_function.calculate_EVD(truep, torch.matmul(X, y_hat)).item()
 
     # Get the initial ensemble comprised of the best models
     losses = pd.Series(losses).sort_values()
@@ -555,7 +555,7 @@ def ensemble_selector(loss_function, optim_for_loss, y_hats, init_size=1,
             init_loss = loss_function.apply(
                 y_hat, initD, mu_sa, muE, F, mdp_data)
         else:
-            init_loss = loss_function.calculate_EVD(truep, y_hat).item()
+            init_loss = loss_function.calculate_EVD(truep, torch.matmul(X, y_hat)).item()
 
     # Define the set of available models
     if replacement:
@@ -587,7 +587,7 @@ def ensemble_selector(loss_function, optim_for_loss, y_hats, init_size=1,
                     tmp_y_avg[mod], initD, mu_sa, muE, F, mdp_data).item()
             else:
                 tmp_losses[mod] = loss_function.calculate_EVD(
-                    truep, tmp_y_avg[mod]).item()
+                    truep, torch.matmul(X, tmp_y_avg[mod])).item()
 
         # Locate the best trial
         best_model = pd.Series(tmp_losses).sort_values().index[0]
@@ -612,14 +612,10 @@ def ensemble_selector(loss_function, optim_for_loss, y_hats, init_size=1,
 
     return ensemble_loss, model_weights.fillna(0).astype(float)
 
-def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate):
+def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate, X):
 
     # use ensemble selector to generate ensemble of NN's optimised by min loss or min evd depending on "opitim_for_loss" variable
-    # state features
-    X = torch.Tensor([[0, 0],
-                      [1, 0],
-                      [2, 0],
-                      [3, 0]])
+
 
     models_to_train = models_to_train  # train this many models
     max_epochs = max_epochs  # for this many epochs
@@ -655,19 +651,22 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate)
             epoch_evd = []
             for i in range(iters_per_epoch):
                 # Compute predicted R
-                yhat = torch.empty(len(X))
+                yhat = torch.empty(len(X[0]), 1)
                 indexer = 0
-                for f in X:
-                    this_state_r = net(f.view(-1, len(f)))
+                for f in range(len(X[0])):
+                    this_state_r = net(X[:, f].view(-1, len(X[:, f])))
                     yhat[indexer] = this_state_r
                     indexer += 1
+                
+                
+                 
 
                 # compute loss and EVD
                 loss = NLL.apply(yhat, initD, mu_sa, muE, F, mdp_data)
-                evd = NLL.calculate_EVD(truep, yhat)
+                evd = NLL.calculate_EVD(truep, torch.matmul(X, yhat))
 
-                print('{}: output: {} | EVD: {} | loss: {} '.format(
-                    i, yhat.detach().numpy(), evd, loss.detach().numpy()))
+                print('{} | EVD: {} | loss: {} '.format(
+                    i, evd, loss.detach().numpy()))
 
                 # Backpropogate and update weights
                 loss.backward()
@@ -704,10 +703,8 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate)
     trained_models = {}
     metrics = {}
     y_hats_test = {}
-    x_test = torch.Tensor([[0, 0],
-                           [1, 0],
-                           [2, 0],
-                           [3, 0]])  # features for test
+
+    x_test = X  # features for test
 
     for model_name in model_names:
         # Load the last checkpoint
@@ -728,17 +725,18 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate)
         # Compute predictions on the validation and test sets, compute the
         # metrics for the latter (validation stuff has already been saved)
         # Compute predicted R
-        y_hat_test = torch.empty(len(X))
+        y_hat_test = torch.empty(len(X[0]), 1)
         indexer = 0
-        for f in x_test:
-            this_state_r = net(f.view(-1, len(f)))
+        for j in range(len(x_test[0])):
+            this_state_r = net(x_test[:, j].view(-1, len(x_test[:, j])))
             y_hat_test[indexer] = this_state_r
             indexer += 1
+       
 
         # compute evd & loss
         test_loss = NLL.apply(y_hat_test, initD, mu_sa,
                               muE, F, mdp_data).item()
-        test_evd = NLL.calculate_EVD(truep, y_hat_test)
+        test_evd = NLL.calculate_EVD(truep, torch.matmul(X, y_hat_test))
 
         # Store the outputs
         trained_models[model_name] = net
@@ -791,7 +789,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate)
     fig.tight_layout(w_pad=5)
 
     ensemble_loss, model_weights = ensemble_selector(
-        loss_function=NLL, optim_for_loss=True, y_hats=y_hats_test, init_size=1, replacement=True, max_iter=10)
+        loss_function=NLL, optim_for_loss=True, y_hats=y_hats_test, X=X, init_size=1, replacement=True, max_iter=10)
 
     print("\nEnsemble Loss:")
     print(ensemble_loss)
@@ -865,12 +863,12 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate)
 
     # EVD-minimising ensemble on the test set
     ensemble_acc, model_weights = ensemble_selector(
-        loss_function=NLL, optim_for_loss=False, y_hats=y_hats_test, init_size=1, replacement=True, max_iter=10)
+        loss_function=NLL, optim_for_loss=False, y_hats=y_hats_test, X=X, init_size=1, replacement=True, max_iter=10)
 
     # Compute evd of the equally weighted ensemble
     evds = []
     for model, predictedR in y_hats_test.items():
-        evds.append(NLL.calculate_EVD(truep, predictedR))
+        evds.append(NLL.calculate_EVD(truep, torch.matmul(X, predictedR)))
     ens_acc_test_avg = sum(evds) / len(evds)
     ens_acc_test_avg = ens_acc_test_avg.item()
 
@@ -1050,8 +1048,8 @@ def run_single_NN(evdThreshold, optim_type, net, X):
 
         return net
 
-N = 3000 #number of sampled trajectories
-T = 8 #number of actions in each trajectory
+N = 5000 #number of sampled trajectories
+T = 16 #number of actions in each trajectory
 
 print("\n ... generating MDP and intial R ...")
 #generate mdp and R
@@ -1101,18 +1099,19 @@ trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 
 print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r, trueNLL, optimal_policy))  # Printline if LH is scalar
 
+'''
 # run single NN
 mynet = NonLinearNet()
 single_net = run_single_NN(0.003, "Adam", mynet, feature_data['splittable'])
-
-
 '''
+
+
 # run NN ensemble
 models_to_train = 10  # train this many models
-max_epochs = 3       # for this many epochs
-iters_per_epoch = 50
+max_epochs = 5      # for this many epochs
+iters_per_epoch = 100
 learning_rate = 0.1
-models, model_weights =  run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate)
+models, model_weights =  run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate, feature_data['splittable'])
 
 #get ensemble model predictions
 ensemble_models = []
@@ -1139,7 +1138,7 @@ v, q, logp, ensemblep = linearvalueiteration(mdp_data, ensemble_models.iloc[-1].
 ensembleoptimal_policy = np.argmax(ensemblep.detach().cpu().numpy(), axis=1)
 
 #print metrics for final R from ensemble
-print('\nFinal Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(ensemble_models.iloc[-1], ensembleoptimal_policy, NLL.calculate_EVD(truep, ensemble_models.iloc[-1]), NLL.apply(ensemble_models.iloc[-1], initD, mu_sa, muE, F, mdp_data)))
+print('\nFinal Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(ensemble_models.iloc[-1], ensembleoptimal_policy, NLL.calculate_EVD(truep, torch.matmul(X, ensemble_models.iloc[-1])), NLL.apply(ensemble_models.iloc[-1], initD, mu_sa, muE, F, mdp_data)))
 
 #stack all predicted rewards
 predictions = torch.empty(len(ensemble_models), mdp_params['n']**2)
@@ -1158,7 +1157,7 @@ for column in range(predictions.size()[1]):
 #calculate metrics for avg R from ensemble
 v, q, logp, avgensemblep = linearvalueiteration(mdp_data, average_predictions.view(4, 1))
 avgensembleoptimal_policy = np.argmax(avgensemblep.detach().cpu().numpy(), axis=1)
-print('\nAverage Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(average_predictions, avgensembleoptimal_policy, NLL.calculate_EVD(truep, average_predictions), NLL.apply(average_predictions, initD, mu_sa, muE, F, mdp_data)))
+print('\nAverage Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(average_predictions, avgensembleoptimal_policy, NLL.calculate_EVD(truep, torch.matmul(X, average_predictions)), NLL.apply(average_predictions, initD, mu_sa, muE, F, mdp_data)))
 print('\nPredictions Uncertainty {}'.format(predictions_uncertainty))
 
 
@@ -1177,7 +1176,7 @@ plt.show()
 
 
 
-'''
+
 
 
 
