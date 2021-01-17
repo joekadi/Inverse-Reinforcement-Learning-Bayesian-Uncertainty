@@ -32,6 +32,7 @@ torch.set_printoptions(precision=3)
 torch.set_default_tensor_type(torch.DoubleTensor)
 np.set_printoptions(precision=3)
 
+print(torch.__version__)
 class testers:
 
     def checkgradients_NN(self, input, linear):
@@ -1081,7 +1082,7 @@ optimal_policy = np.argmax(truep.detach().cpu().numpy(), axis=1)
 print("\n... done ...")
 
 # Sample paths
-print("\n... sampling paths from true R ... \n")
+print("\n... sampling paths from true R ...")
 example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
 print("\n... done ...")
 
