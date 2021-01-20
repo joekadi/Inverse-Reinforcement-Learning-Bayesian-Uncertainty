@@ -14,7 +14,7 @@ def maxentsoftmax(q):
     return v
 
 def linearvalueiteration(mdp_data, r):
-    
+
     v = torch.zeros((int(mdp_data['states']), 1), dtype=float)
     sa_s = copy.copy(mdp_data['sa_s'])
     sa_s = sa_s.type(torch.float64)

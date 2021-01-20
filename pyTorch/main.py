@@ -3,6 +3,7 @@ from pyro.optim import Adam
 from pyro.distributions import Gamma, Poisson, Normal, Binomial
 import pyro.distributions as dist
 import pyro
+import torch.nn as nn
 from torch.nn.functional import softplus
 import torch.nn.functional as F
 from nonlinearBNN import *
@@ -25,14 +26,13 @@ import pprint
 from sampleexamples import *
 import numpy as np
 import pandas as pd
-np.set_printoptions(suppress=True)
+np.set_printoptions(suppress=False)
 
-torch.set_printoptions(precision=3)
+torch.set_printoptions(precision=5, sci_mode=False)
 # default type to torch.float64
 torch.set_default_tensor_type(torch.DoubleTensor)
-np.set_printoptions(precision=3)
+np.set_printoptions(precision=5)
 
-print(torch.__version__)
 class testers:
 
     def checkgradients_NN(self, input, linear):
@@ -637,7 +637,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
 
     for model_name in model_names:
         # Define the model and optimiser
-        net = NonLinearNet()
+        net = NonLinearNet(len(X))
         optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
 
         train_loss = []
@@ -670,6 +670,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
 
                 # Backpropogate and update weights
                 loss.backward()
+                nn.utils.clip_grad_value_(net.parameters(), clip_value=3)
                 optimizer.step()
 
                 # Append loss and EVD estimates
@@ -896,6 +897,42 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
 
     return y_hats_test, model_weights
 
+def likelihood(r, initD, mu_sa, muE, F, mdp_data):
+        #Returns NLL w.r.t input r
+
+        '''
+        if(torch.is_tensor(r) == False):
+            r = torch.tensor(r) #cast to tensor
+        if(r.shape != (mdp_data['states'],5)):
+            #reformat to be in shape (states,actions)
+            r = torch.reshape(r, (int(mdp_data['states']),1))
+            r = r.repeat((1, 5))
+        '''
+
+        if(torch.is_tensor(r) == False):
+            r = torch.tensor(r) #cast to tensor
+        if(r.shape != (mdp_data['states'],5)):
+            #convert to full reward
+            r = torch.matmul(F, r)
+
+
+        #Solve MDP with current reward
+        v, q, logp, p = linearvalueiteration(mdp_data, r) 
+   
+        #Calculate likelihood from logp
+        likelihood = torch.empty(mu_sa.shape, requires_grad=True)
+
+
+        likelihood = torch.sum(torch.sum(logp*mu_sa)) #for scalar likelihood
+
+        #LH for each state as tensor size (states,1)
+        #mul = logp*mu_sa #hold
+        #likelihood = torch.sum(mul, dim=1)
+        #likelihood.requires_grad = True
+        
+      
+        return -likelihood
+
 def run_single_NN(evdThreshold, optim_type, net, X):
 
         #net = NonLinearNet()
@@ -906,14 +943,6 @@ def run_single_NN(evdThreshold, optim_type, net, X):
         # bias = false on weight params seems to work when inital R is 0
         # check gradients with torch.gradcheck
 
-        '''
-        X = torch.Tensor([[0, 0],
-                          [1, 0],
-                          [2, 0],
-                          [3, 0]
-                          ])  # for NN(state feature vector) = reward
-
-        '''
 
 
         evd = 10
@@ -925,13 +954,17 @@ def run_single_NN(evdThreshold, optim_type, net, X):
         iterations = []
         evdList = []
         i = 0
+        finalOutput = None
+
+        
 
         if (optim_type == 'Adam'):
             print('\nOptimising with torch.Adam\n')
             # weight decay for l2 regularisation
             optimizer = torch.optim.Adam(
                 net.parameters(), lr=lr, weight_decay=1e-2)
-            while(evd > evdThreshold):
+            #while(evd > evdThreshold):
+            for p in range(200):
                 # for i in range(50):
                 net.zero_grad()
 
@@ -947,29 +980,37 @@ def run_single_NN(evdThreshold, optim_type, net, X):
 
                 #new way on creating R size [features,1] - inline with matlab
                 output = torch.empty(len(X[0]), 1)
+                
                 indexer = 0
                 for j in range(len(X[0])):
                     thisR = net(X[:, j].view(-1, len(X[:, j])))
                     output[indexer] = thisR
                     indexer += 1
 
-            
 
-                # get loss from curr output
+                finalOutput = output
+
+                #use this line for custom gradient
                 loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data)
+
+                #use this line for auto gradient
+                #loss = likelihood(output, initD, mu_sa, muE, F, mdp_data)
+
                 # check gradients
                 #tester.checkgradients_NN(output, NLL)
                 #print('Output {} with grad fn {}'.format(output, output.grad_fn))
                 #print('Loss {} with grad fn {}'.format(loss, loss.grad_fn))
                 loss.backward()  # propagate grad through network
+                nn.utils.clip_grad_norm_(net.parameters(), max_norm=2.0, norm_type=2)
+
                 evd = NLL.calculate_EVD(truep, torch.matmul(X, output))  # calc EVD
                 optimizer.step()
 
-                # Printline when LH is vector
-                #print('{}: output: {} | EVD: {} | loss: {} | {}'.format(i, output.detach().numpy(), evd,loss.detach().numpy(), sum(loss).detach().numpy()))
-                # Printline when LH scalar
-                #print('{}: output: {} | EVD: {} | loss: {} '.format(i, output.detach().numpy(), evd, loss.detach().numpy()))
 
+                #printline to show est R
+                #print('{}: output:\n {} | EVD: {} | loss: {} '.format(i, torch.matmul(X, output).repeat(1, 5).detach().numpy(), evd, loss.detach().numpy()))
+
+                #printline to hide est R
                 print('{}: | EVD: {} | loss: {} '.format(i, evd, loss.detach().numpy()))
                 # store metrics for printing
                 NLList.append(loss.item())
@@ -1045,32 +1086,49 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                     '\nTrue R: \n{}\n - with optimal policy {}'.format(r[:, 0].view(4, 1), optimal_policy))
                 print('\nFinal Estimated R after 100 optim steps: \n{}\n - with optimal policy {}\n - avg EVD of {}'.format(
                     finaloutput.view(4, 1), thisoptimal_policy, sum(evdList)/len(evdList)))
+         # plot
+        
+        
+        f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+        ax1.plot(iterations, NLList)
+        ax1.plot(iterations, NLList, 'r+')
+        ax1.set_title('NLL')
 
-        return net
+        ax2.plot(iterations, evdList)
+        ax2.plot(iterations, evdList, 'r+')
+        ax2.set_title('Expected Value Diff')
+        plt.show()
+        return net, finalOutput
 
-N = 5000 #number of sampled trajectories
+def create_gridworld():
+    print("\n ... generating gridworld MDP and intial R ...")
+    mdp_params = {'n': 8, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
+    mdp_data, r, feature_data = gridworldbuild(mdp_params)
+    print("\n... done ...")
+    return mdp_data, r, feature_data
+
+def create_objectworld():
+    print("\n ... generating objectworld MDP and intial R ...")
+    mdp_params = {'n': 8, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.99, 'seed': 0, 'r_tree': None}
+    step = mdp_params['c1'] + mdp_params['c2']
+    r_tree = {'type': 1, 'test':1+step*2, 'total_leaves':3,           # Test distance to c1 1 shape
+        'ltTree':{'type':0, 'index': 0,'mean':[0,0,0,0,0]},           # Neutral reward for being elsewhere
+        'gtTree': {'type':1,'test':2+step*1,'total_leaves':2,         # Test distance to c1 2 shape
+            'gtTree':{'type':0, 'index':1,'mean':[1,1,1,1,1]},        # Reward for being close
+            'ltTree':{'type':0,'index':2,'mean':[-2,-2,-2,-2,-2]}}}   # Penalty otherwise
+    mdp_params['r_tree'] = r_tree
+    mdp_data, r, feature_data, true_feature_map = objectworldbuild(mdp_params)
+    print("\n... done ...")
+    return mdp_data, r, feature_data, true_feature_map
+
+
+N = 1000 #number of sampled trajectories
 T = 16 #number of actions in each trajectory
 
-print("\n ... generating MDP and intial R ...")
 #generate mdp and R
-'''
-mdp_params = {'n': 2, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
-mdp_data, r = gridworldbuild(mdp_params)
-'''
+#mdp_data, r, feature_data = create_gridworld()
+mdp_data, r, feature_data, true_feature_map = create_objectworld()
 
-#r_tree = struct('type',1,'test',1+step*2,'total_leaves',3,'ltTree',struct('type',0,'index',1,'mean',[0,0,0,0,0]),'gtTree',struct('type',1,'test',2+step*1,'total_leaves',2,'gtTree',struct('type',0,'index',2,'mean',[1 1 1 1 1]),'ltTree',struct('type',0,'index',3,'mean',[-2 -2 -2 -2 -2])));  
-
-mdp_params = {'n': 10, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.99, 'seed': 0, 'r_tree': None}
-step = mdp_params['c1'] + mdp_params['c2']
-r_tree = {'type': 1, 'test':1+step*2, 'total_leaves':3,           # Test distance to c1 1 shape
-    'ltTree':{'type':0, 'index': 0,'mean':[0,0,0,0,0]},           # Neutral reward for being elsewhere
-    'gtTree': {'type':1,'test':2+step*1,'total_leaves':2,         # Test distance to c1 2 shape
-        'gtTree':{'type':0, 'index':1,'mean':[1,1,1,1,1]},        # Reward for being close
-        'ltTree':{'type':0,'index':2,'mean':[-2,-2,-2,-2,-2]}}}   # Penalty otherwise
-mdp_params['r_tree'] = r_tree
-mdp_data, r, feature_data, true_feature_map = objectworldbuild(mdp_params)
-
-print("\n... done ...")
 
 # Solve MDP
 print("\n... performing value iteration for v, q, logp and truep ...")
@@ -1085,31 +1143,46 @@ example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
 print("\n... done ...")
 
 
+#initalise loss function
 NLL = NLLFunction()  # initialise NLL
 initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples, feature_data)  # calculate required variables
-
+initD = initD/10 #scale down
 # assign constant class variable
 NLL.F = F
 NLL.muE = muE
 NLL.mu_sa = mu_sa
 NLL.initD = initD
 NLL.mdp_data = mdp_data
-
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
+print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r, trueNLL, optimal_policy))  # Printline if LH is scalar
 
+
+#run single NN
+mynet = NonLinearNet(len(feature_data['splittable']))
+single_net, predictedR = run_single_NN(0.003, "Adam", mynet, feature_data['splittable'])
+
+
+#calculate, format and print results
+if(predictedR.shape != (mdp_data['states'],5)):
+    #convert to full reward
+    predictedR = torch.matmul(feature_data['splittable'], predictedR)
+    predictedR = predictedR.repeat((1, 5))
+predictedv, predictedq, predictedlogp, predictedP = linearvalueiteration(mdp_data, predictedR)
+predicted_mdp_solution = {'v': predictedv, 'q': predictedq, 'p': predictedP, 'logp': predictedlogp}
+predicted_optimal_policy = np.argmax(predictedP.detach().cpu().numpy(), axis=1)
+print("Predicted R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(predictedR, NLL.apply(predictedR, initD, mu_sa, muE, F, mdp_data), predicted_optimal_policy))  # Printline if LH is scalar
 print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r, trueNLL, optimal_policy))  # Printline if LH is scalar
 
 '''
-# run single NN
-mynet = NonLinearNet()
-single_net = run_single_NN(0.003, "Adam", mynet, feature_data['splittable'])
-'''
+
+
+
 
 
 # run NN ensemble
 models_to_train = 10  # train this many models
-max_epochs = 5      # for this many epochs
-iters_per_epoch = 100
+max_epochs = 3      # for this many epochs
+iters_per_epoch = 50
 learning_rate = 0.1
 models, model_weights =  run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate, feature_data['splittable'])
 
@@ -1177,8 +1250,7 @@ plt.show()
 
 
 
-
-
+'''
 
 
 
@@ -1221,13 +1293,15 @@ trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 
 print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r[:, 0], trueNLL, optimal_policy))  # Printline if LH is scalar
 
+"""
 
 # run single NN
-'''
+"""
 mynet = NonLinearNet()
 single_net = run_single_NN(0.003, "Adam", mynet)
-'''
+"""
 
+'''
 # run NN ensemble
 models_to_train = 10  # train this many models
 max_epochs = 3       # for this many epochs
@@ -1298,7 +1372,7 @@ plt.show()
 
 
 
-"""
+'''
 
 
 
@@ -1382,3 +1456,54 @@ ax2.set_title('Predicted Rewards')
 plt.errorbar(np.linspace(-10,10,4), predictedRewards, xerr=0.2, yerr=0.4, fmt='o', color='black', ecolor='lightgray', elinewidth=3, capsize=0)
 plt.show()
 '''
+
+"""
+# playground from here 
+# -------------------------------
+
+[states,actions,transitions] = mdp_data['sa_p'].size()
+D = torch.zeros(states,1)
+diff = 1.0
+threshold = 0.00001
+features = F.shape[2-1]
+r = torch.rand(features,1)
+for j in range(1):
+    # Dp = torch.tensor(D.clone().detach().requires_grad_(True), dtype=torch.float64)
+    Dp = D
+    #left_hold = torch.tensor(np.tile(p[...,None], (1,1,transitions)))
+    #LHS = torch.mul(left_hold, mdp_data['sa_p'])
+    #RHS = torch.tensor(np.tile(Dp[...,None], (1,actions,transitions)))
+    #RHS = RHS0*mdp_data['discount']
+
+  
+    Dpi = torch.mul(torch.mul(torch.tensor(np.tile(mdp_solution['p'][...,None], (1,1,transitions))), mdp_data['sa_p'].type('torch.DoubleTensor')), torch.tensor(np.tile(Dp[...,None], (1,actions,transitions)))*mdp_data['discount'])
+    
+    '''
+    print(Dpi.size())
+    print('sa_p\n', Dpi[:,:,0])
+    print('sa_p\n', Dpi[:,:,1])
+    print('sa_p\n', Dpi[:,:,2])
+    print('sa_p\n', Dpi[:,:,3])
+    print('sa_p\n', Dpi[:,:,4])
+    '''
+
+    D_CSR = sps.csc_matrix((Dpi.transpose(1,0).flatten(), mdp_data['sa_s'].transpose(1,0).flatten().type('torch.DoubleTensor'), torch.arange(states*actions*transitions+1)), shape=(states,states*actions*transitions)) 
+    D_CSR.eliminate_zeros()    
+    D_mx = torch.tensor(D_CSR.todense()) @ torch.ones(states*actions*transitions,1)
+    D_s = torch.sum(D_mx,1)
+    D_s = D_s.view(len(D_s), 1)
+    D = initD + D_s
+
+    print(D)
+    
+    diff = torch.max(torch.abs(torch.subtract(D,Dp)))
+
+
+'''
+print('sa_p\n', mdp_data['sa_s'][:,:,0])
+print('sa_p\n', mdp_data['sa_s'][:,:,1])
+print('sa_p\n', mdp_data['sa_s'][:,:,2])
+print('sa_p\n', mdp_data['sa_s'][:,:,3])
+print('sa_p\n', mdp_data['sa_s'][:,:,4])
+'''
+"""

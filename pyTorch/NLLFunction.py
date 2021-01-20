@@ -52,8 +52,12 @@ class NLLFunction(torch.autograd.Function):
         '''
         
         
-        #Compute feature expectations.
+
+
         F = feature_data['splittable']
+  
+
+
         features = F.shape[2-1]
         #print('Features {}'.format(self.F))
 
@@ -74,7 +78,8 @@ class NLLFunction(torch.autograd.Function):
                 muE = muE + torch.matmul(torch.t(F),state_vec)
                             
         #initlaise params to construct sparse matrix
-        ex_s_reshaped = torch.flatten(torch.t(ex_s)) #flatten in column order
+        #ex_s_reshaped = torch.flatten(torch.t(ex_s)) #flatten in column order
+        ex_s_reshaped = ex_s.transpose(1,0).flatten()
         ex_s_reshaped = ex_s_reshaped.type(torch.int) #cast to int since indicies array
         po = torch.arange(N*T+1)
         Rones = torch.ones((N*T))
@@ -82,7 +87,7 @@ class NLLFunction(torch.autograd.Function):
      
         #Generate initial state distribution for infinite horizon.
         initD_CSR = sps.csc_matrix((Rones, ex_s_reshaped, po), shape=(int(mdp_data['states']),T*N))
-        initD_CSR.eliminate_zeros() 
+        #initD_CSR.eliminate_zeros() 
         initD_mx = torch.matmul(torch.tensor(initD_CSR.todense()), ones)
         initD = torch.sum(initD_mx,1)
 
@@ -93,6 +98,7 @@ class NLLFunction(torch.autograd.Function):
                 for k in range(transitions):
                     sp = mdp_data['sa_s'][s,a,k]
                     initD[sp] = initD[sp] - mdp_data['discount']*mdp_data['sa_p'][s,a,k]
+       
         '''
         print('mu_sa \n{}\n'.format(self.mu_sa))
         print('muE \n{}\n'.format(self.muE))
@@ -100,8 +106,10 @@ class NLLFunction(torch.autograd.Function):
         print('F \n{}\n'.format(self.F))
         print('Features \n{}\n'.format(features))
         '''
+        
         self.initD = torch.reshape(initD, (int(mdp_data['states']),1))
         initD = torch.reshape(initD, (int(mdp_data['states']),1)) 
+
 
         self.mu_sa = mu_sa
         self.muE = muE
@@ -124,12 +132,12 @@ class NLLFunction(torch.autograd.Function):
             r = r.repeat((1, 5))
         '''
 
-
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r) #cast to tensor
         if(r.shape != (mdp_data['states'],5)):
             #convert to full reward
             r = torch.matmul(F, r)
+            r = r.repeat((1, 5))
 
 
         #Solve MDP with current reward
@@ -146,8 +154,9 @@ class NLLFunction(torch.autograd.Function):
         #likelihood = torch.sum(mul, dim=1)
         #likelihood.requires_grad = True
         
+      
         return -likelihood
-
+    
     @staticmethod
     def backward(ctx, grad_output):
         #print('Grad output {}'.format(grad_output))
@@ -165,41 +174,43 @@ class NLLFunction(torch.autograd.Function):
             'sa_p':sa_p
             }
 
-        '''
+        """
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r) #cast to tensor
         if(r.shape != (mdp_data['states'],5)):
             #reformat to be in shape (states,actions)
             r = torch.reshape(r, (int(mdp_data['states']),1))
             r = r.repeat((1, 5))
-        '''
+        """
 
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r) #cast to tensor
         if(r.shape != (mdp_data['states'],5)):
             #convert to full reward
             r = torch.matmul(F, r)
+            r = r.repeat((1, 5))
 
 
         #Solve MDP with current reward
         v, q, logp, p = linearvalueiteration(mdp_data, r) 
         
-
         #Calc gradient w.r.t to forward inputs 
         D = grad_output.clone()
         D = linearmdpfrequency(mdp_data,p.detach().cpu().numpy(),initD.detach().cpu().numpy())#Compute state visitation count D
         D = torch.tensor(D.clone().detach().requires_grad_(True)) #Cast to tensor
         dr = muE - torch.matmul(torch.t(F),D) #Compute gradient
-
+        #print('gradient:\n',-dr)
         #dr = dr.repeat((1, 5)) #make shape [states, 5]
 
         #dr = dr.view(len(dr)) #Make row vector
-        
-        return -dr, None, None, None, None, None #+dr, return -dr for descent 
+
+        return -dr, None, None, None, None, None #return -dr for descent 
+    
 
     def calculate_EVD(self, trueP, currR):
-
-        v, q, logp, currP = linearvalueiteration(self.mdp_data, currR.view(int(self.mdp_data['states']),1))
+        if(currR.shape != (len(currR),5)):
+            currR = currR.repeat((1, 5))
+        v, q, logp, currP = linearvalueiteration(self.mdp_data, currR)
         #Expected Value Diff = diff in policies since exact True R values never actually learned, only it's structure
         evd=torch.max(torch.abs(currP-trueP))
         return evd

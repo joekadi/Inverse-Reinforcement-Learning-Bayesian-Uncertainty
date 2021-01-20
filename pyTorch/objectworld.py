@@ -262,3 +262,6 @@ def cartaverage(tree,feature_data):
     
     return R
 
+#def draw(r,p,g,mdp_params,mdp_data,feature_data,model):
+
+
