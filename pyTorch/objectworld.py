@@ -218,6 +218,7 @@ def objectworldfeatures(mdp_params, mdp_data):
         true_feature_map[s,leaf] = 1
     #Fill in the reward function.
     R_SCALE = 5
+    #print('feature data', feature_data['splittable'][0,:])
     r = cartaverage(mdp_params['r_tree'],feature_data)*R_SCALE
 
     return r, feature_data, true_feature_map
@@ -251,15 +252,17 @@ def cartaverage(tree,feature_data):
     else:
         #Compute reward on each side.
         ltR = cartaverage(tree['ltTree'],feature_data)
+        
         gtR = cartaverage(tree['gtTree'],feature_data)
+        #print('gtR', gtR)
 
     #Combine.
-    ind = np.tile(feature_data['splittable'][:, int(tree['test'])], (1, ltR.shape[1]))
+
+    ind = np.tile(feature_data['splittable'][:, int(tree['test'])].view(len(feature_data['splittable'][:, int(tree['test'])]),1), (1, ltR.shape[1]))
     ind = np.reshape(ind, ltR.size())
     ind = torch.tensor(ind)
     hold= (1-ind)*ltR 
     R = hold + ind*gtR
-    
     return R
 
 #def draw(r,p,g,mdp_params,mdp_data,feature_data,model):

@@ -963,8 +963,8 @@ def run_single_NN(evdThreshold, optim_type, net, X):
             # weight decay for l2 regularisation
             optimizer = torch.optim.Adam(
                 net.parameters(), lr=lr, weight_decay=1e-2)
-            #while(evd > evdThreshold):
-            for p in range(200):
+            while(evd > evdThreshold):
+            #for p in range(200):
                 # for i in range(50):
                 net.zero_grad()
 
@@ -988,6 +988,7 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                     indexer += 1
 
 
+
                 finalOutput = output
 
                 #use this line for custom gradient
@@ -1005,7 +1006,6 @@ def run_single_NN(evdThreshold, optim_type, net, X):
 
                 evd = NLL.calculate_EVD(truep, torch.matmul(X, output))  # calc EVD
                 optimizer.step()
-
 
                 #printline to show est R
                 #print('{}: output:\n {} | EVD: {} | loss: {} '.format(i, torch.matmul(X, output).repeat(1, 5).detach().numpy(), evd, loss.detach().numpy()))
@@ -1102,14 +1102,14 @@ def run_single_NN(evdThreshold, optim_type, net, X):
 
 def create_gridworld():
     print("\n ... generating gridworld MDP and intial R ...")
-    mdp_params = {'n': 8, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
+    mdp_params = {'n': 32, 'b': 4, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
     mdp_data, r, feature_data = gridworldbuild(mdp_params)
     print("\n... done ...")
     return mdp_data, r, feature_data
 
 def create_objectworld():
     print("\n ... generating objectworld MDP and intial R ...")
-    mdp_params = {'n': 8, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.99, 'seed': 0, 'r_tree': None}
+    mdp_params = {'n': 32, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.9, 'seed': 0, 'r_tree': None}
     step = mdp_params['c1'] + mdp_params['c2']
     r_tree = {'type': 1, 'test':1+step*2, 'total_leaves':3,           # Test distance to c1 1 shape
         'ltTree':{'type':0, 'index': 0,'mean':[0,0,0,0,0]},           # Neutral reward for being elsewhere
@@ -1117,31 +1117,32 @@ def create_objectworld():
             'gtTree':{'type':0, 'index':1,'mean':[1,1,1,1,1]},        # Reward for being close
             'ltTree':{'type':0,'index':2,'mean':[-2,-2,-2,-2,-2]}}}   # Penalty otherwise
     mdp_params['r_tree'] = r_tree
+   
+
     mdp_data, r, feature_data, true_feature_map = objectworldbuild(mdp_params)
     print("\n... done ...")
     return mdp_data, r, feature_data, true_feature_map
 
 
-N = 1000 #number of sampled trajectories
-T = 16 #number of actions in each trajectory
+N = 16 #number of sampled trajectories
+T = 8 #number of actions in each trajectory
 
 #generate mdp and R
 #mdp_data, r, feature_data = create_gridworld()
 mdp_data, r, feature_data, true_feature_map = create_objectworld()
 
 
-# Solve MDP
+#Solve MDP
 print("\n... performing value iteration for v, q, logp and truep ...")
 v, q, logp, truep = linearvalueiteration(mdp_data, r)
 mdp_solution = {'v': v, 'q': q, 'p': truep, 'logp': logp}
 optimal_policy = np.argmax(truep.detach().cpu().numpy(), axis=1)
 print("\n... done ...")
 
-# Sample paths
+#Sample paths
 print("\n... sampling paths from true R ...")
 example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
 print("\n... done ...")
-
 
 #initalise loss function
 NLL = NLLFunction()  # initialise NLL
@@ -1159,7 +1160,7 @@ print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(
 
 #run single NN
 mynet = NonLinearNet(len(feature_data['splittable']))
-single_net, predictedR = run_single_NN(0.003, "Adam", mynet, feature_data['splittable'])
+single_net, predictedR = run_single_NN(0.000001, "Adam", mynet, feature_data['splittable'])
 
 
 #calculate, format and print results
@@ -1173,12 +1174,9 @@ predicted_optimal_policy = np.argmax(predictedP.detach().cpu().numpy(), axis=1)
 print("Predicted R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(predictedR, NLL.apply(predictedR, initD, mu_sa, muE, F, mdp_data), predicted_optimal_policy))  # Printline if LH is scalar
 print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r, trueNLL, optimal_policy))  # Printline if LH is scalar
 
+
+
 '''
-
-
-
-
-
 # run NN ensemble
 models_to_train = 10  # train this many models
 max_epochs = 3      # for this many epochs
