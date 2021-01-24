@@ -1,10 +1,15 @@
 import torch
 import numpy as np
 from scipy import sparse as sps
+import os
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+
+
 torch.set_printoptions(precision=5)
 
 def gridworldbuild(mdp_params):
-#Construct the Gridworld MDP structures. 
+    #Construct the Gridworld MDP structures. 
     torch.manual_seed(mdp_params['seed'])
     np.random.seed(seed=mdp_params['seed'])
     #Build action mappings
@@ -50,7 +55,7 @@ def gridworldbuild(mdp_params):
                 xe = xc*mdp_params['b']+1
                 for x in range(xs, xe):
                     r[y*mdp_params['n']+x, :] = macro_reward.repeat([1,5])
-
+                
     feature_data = gridworldfeatures(mdp_params,mdp_data)
     return mdp_data, r, feature_data
 
@@ -82,4 +87,112 @@ def gridworldfeatures(mdp_params, mdp_data):
 
     return feature_data
 
+def gwVisualise(test_result):
+
+    # Compute visible examples.
+    Eo = torch.zeros(test_result['mdp_data']['states'],1)
+    for i in range(len(test_result['example_samples'][0])):
+        for t in range(len(test_result['example_samples'][0][0])):
+            Eo[test_result['example_samples'][0][i][t][0]] = 1
+    g = torch.ones(test_result['mdp_data']['states'],1)*0.5+Eo*0.5
+
+    #Create figure.
+    f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
         
+    #Draw reward for ground truth.
+    gridworlddraw(test_result['true_r'],test_result['mdp_solution']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax1)
+
+    # Draw reward for IRL result.
+    gridworlddraw(test_result['irl_result']['r'],test_result['irl_result']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax2)
+    ax1.set_title('Ground Truth Reward & Policy')
+    ax2.set_title('Estimated Reward & Policy')
+    plt.show()
+
+def gridworlddraw(r,p,g,mdp_params, mdp_data, f, ax):
+
+    #Set up the axes.
+    n = mdp_params['n']
+
+    maxr = torch.max(torch.max(r))
+    minr = torch.min(torch.min(r))
+    rngr = maxr-minr
+    rngr = rngr.item()
+
+    if isinstance(g, list):
+        crop = p
+    else:
+        crop = np.array([[1, n], [1,n]])
+
+    ax.set_xlim(0, crop[0,1]-crop[0,0]+1)
+    ax.set_ylim(0, crop[1,1]-crop[1,0]+1)
+
+    if isinstance(g, list):
+        ax.set_xticks([])
+        ax.set_yticks([])
+    else:
+        ax.set_xticks(np.arange(0, crop[0,1]-crop[0,0]+2))
+        ax.set_yticks(np.arange(0, crop[1,1]-crop[1,0]+2))
+
+    #daspect[1 1 1]
+
+    #Draw the reward function
+    for y in range(crop[1,0], crop[1,1]+1):
+        for x in range(crop[0,0], crop[0,1]+1):
+            
+            if rngr == 0:
+                v = 0.0
+            else:
+                v = (torch.mean( r[(y-2)*n+x,:])-minr)/rngr
+                v = v.item()
+            colour = np.array([v,v,v])
+            colour = np.minimum( np.ones((1,3))   ,  np.maximum(np.zeros((1,3)) , colour))
+            rect = patches.Rectangle(xy = (x-crop[0,0],y-crop[1,0]),width=1,height=1,facecolor=colour[0]) #create rectangle patches
+            ax.add_patch(rect) # Add the patch to the Axes
+
+    if isinstance(g, list):
+        print('g contains example traces - just draw those.')
+        print('needs implementeed')
+    else: 
+        #Convert p to action mode.
+        if p.size()[1] != 1:
+            print(p)
+            p = torch.argmax(p, dim=1)
+            p = p.view(len(p), 1)
+            p[0] = 1
+            p[1] = 1
+
+        #Draw paths
+        for y in range(1,n+1):
+            for x in range(1,n+1):
+                s = ((y-1)*n+x)-1
+                a = p[s].item()
+                gridworlddrawagent(x,y,a,np.array([g[s].item(),g[s].item(),g[s].item()]), f, ax)
+
+             
+def gridworlddrawagent(x,y,a,colour,f,ax):
+    overlap = 0
+    w = 1+(overlap)*0.5
+    if (a == 0):
+       circle = patches.FancyBboxPatch(xy = (x-0.6,y-0.6),width=0.2,height=0.2, boxstyle='circle', facecolor=colour, linewidth= w) #create circle patches
+       ax.add_patch(circle) # Add the patch to the Axes
+    else:
+        if a == 4:
+            nx = x-1
+            ny = y
+        elif a == 3:
+            nx = x
+            ny = y-1
+        elif a == 2:
+            nx = x+1
+            ny=y
+        elif a == 1:
+            nx = x
+            ny = y+1
+        vec = np.array([[(nx-x)*0.25],[(ny-y)*0.25]])
+        norm1 = np.array([vec[1], -vec[0]])
+        norm2 = -norm1
+        xv = np.array([x-0.5+vec[0], x-0.5+norm1[0], x-0.5+norm2[0]])
+        yv = np.array([y-0.5+vec[1], y-0.5+norm1[1], y-0.5+norm2[1]])
+        xv = np.append(xv, xv[0])
+        yv = np.append(yv, yv[0])
+        ax.fill(xv, yv, colour, linewidth=w)

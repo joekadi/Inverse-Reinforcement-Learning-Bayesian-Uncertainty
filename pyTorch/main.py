@@ -1,8 +1,10 @@
+
 from pyro.infer import SVI, Trace_ELBO
 from pyro.optim import Adam
 from pyro.distributions import Gamma, Poisson, Normal, Binomial
 import pyro.distributions as dist
 import pyro
+import torch 
 import torch.nn as nn
 from torch.nn.functional import softplus
 import torch.nn.functional as F
@@ -16,6 +18,7 @@ from torch.autograd import Variable
 import torch
 from scipy.optimize import minimize, check_grad
 import os
+import sys
 from NLLFunction import *
 from myNLL import *
 from likelihood import *
@@ -27,11 +30,15 @@ from sampleexamples import *
 import numpy as np
 import pandas as pd
 np.set_printoptions(suppress=False)
+import time
+from sklearn.preprocessing import MinMaxScaler
+import math as math
+import copy 
 
-torch.set_printoptions(precision=5, sci_mode=False)
+torch.set_printoptions(precision=5, sci_mode=False, threshold=1000)
 # default type to torch.float64
 torch.set_default_tensor_type(torch.DoubleTensor)
-np.set_printoptions(precision=5)
+np.set_printoptions(precision=5, threshold=1000)
 
 class testers:
 
@@ -934,7 +941,7 @@ def likelihood(r, initD, mu_sa, muE, F, mdp_data):
         return -likelihood
 
 def run_single_NN(evdThreshold, optim_type, net, X):
-
+        start_time = time.time()
         #net = NonLinearNet()
         tester = testers()
         # initialise rewards by finding true weights for NN. feed features through NN using true Weights to get ground truth reward.
@@ -955,9 +962,6 @@ def run_single_NN(evdThreshold, optim_type, net, X):
         evdList = []
         i = 0
         finalOutput = None
-
-        
-
         if (optim_type == 'Adam'):
             print('\nOptimising with torch.Adam\n')
             # weight decay for l2 regularisation
@@ -965,7 +969,9 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                 net.parameters(), lr=lr, weight_decay=1e-2)
             while(evd > evdThreshold):
             #for p in range(200):
-                # for i in range(50):
+            #while (diff > 0.001):
+                
+                
                 net.zero_grad()
 
                 '''
@@ -978,9 +984,9 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                     indexer += 1
                 '''
 
-                #new way on creating R size [features,1] - inline with matlab
+
                 output = torch.empty(len(X[0]), 1)
-                
+
                 indexer = 0
                 for j in range(len(X[0])):
                     thisR = net(X[:, j].view(-1, len(X[:, j])))
@@ -988,19 +994,15 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                     indexer += 1
 
 
-
                 finalOutput = output
 
-                #use this line for custom gradient
-                loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data)
+                
+                loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data) #use this line for custom gradient
+                #loss = likelihood(output, initD, mu_sa, muE, F, mdp_data) #use this line for auto gradient
+                
+                
+                #tester.checkgradients_NN(output, NLL) # check gradients
 
-                #use this line for auto gradient
-                #loss = likelihood(output, initD, mu_sa, muE, F, mdp_data)
-
-                # check gradients
-                #tester.checkgradients_NN(output, NLL)
-                #print('Output {} with grad fn {}'.format(output, output.grad_fn))
-                #print('Loss {} with grad fn {}'.format(loss, loss.grad_fn))
                 loss.backward()  # propagate grad through network
                 nn.utils.clip_grad_norm_(net.parameters(), max_norm=2.0, norm_type=2)
 
@@ -1086,26 +1088,32 @@ def run_single_NN(evdThreshold, optim_type, net, X):
                     '\nTrue R: \n{}\n - with optimal policy {}'.format(r[:, 0].view(4, 1), optimal_policy))
                 print('\nFinal Estimated R after 100 optim steps: \n{}\n - with optimal policy {}\n - avg EVD of {}'.format(
                     finaloutput.view(4, 1), thisoptimal_policy, sum(evdList)/len(evdList)))
-         # plot
+         
         
         
-        f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
-        ax1.plot(iterations, NLList)
-        ax1.plot(iterations, NLList, 'r+')
-        ax1.set_title('NLL')
+        if plots:
+            # plot
+            f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+            ax1.plot(iterations, NLList)
+            ax1.plot(iterations, NLList, 'r+')
+            ax1.set_title('NLL')
 
-        ax2.plot(iterations, evdList)
-        ax2.plot(iterations, evdList, 'r+')
-        ax2.set_title('Expected Value Diff')
-        plt.show()
-        return net, finalOutput
+            ax2.plot(iterations, evdList)
+            ax2.plot(iterations, evdList, 'r+')
+            ax2.set_title('Expected Value Diff')
+            plt.show()
+        
+
+        print("\nruntime: --- %s seconds ---\n" % (time.time() - start_time) )
+        return net, finalOutput, (time.time() - start_time)
 
 def create_gridworld():
     print("\n ... generating gridworld MDP and intial R ...")
-    mdp_params = {'n': 32, 'b': 4, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
+    #mdp_params = {'n': 32, 'b': 4, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
+    mdp_params = {'n': 16, 'b': 2, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
     mdp_data, r, feature_data = gridworldbuild(mdp_params)
     print("\n... done ...")
-    return mdp_data, r, feature_data
+    return mdp_data, r, feature_data, mdp_params
 
 def create_objectworld():
     print("\n ... generating objectworld MDP and intial R ...")
@@ -1116,21 +1124,29 @@ def create_objectworld():
         'gtTree': {'type':1,'test':2+step*1,'total_leaves':2,         # Test distance to c1 2 shape
             'gtTree':{'type':0, 'index':1,'mean':[1,1,1,1,1]},        # Reward for being close
             'ltTree':{'type':0,'index':2,'mean':[-2,-2,-2,-2,-2]}}}   # Penalty otherwise
-    mdp_params['r_tree'] = r_tree
+    mdp_params['r_tree'] = r_tree,
    
-
     mdp_data, r, feature_data, true_feature_map = objectworldbuild(mdp_params)
     print("\n... done ...")
-    return mdp_data, r, feature_data, true_feature_map
+    return mdp_data, r, feature_data, true_feature_map, mdp_params
 
 
-N = 16 #number of sampled trajectories
+
+
+worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
+
+plots = False 
+
+N = 32 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
 
 #generate mdp and R
-#mdp_data, r, feature_data = create_gridworld()
-mdp_data, r, feature_data, true_feature_map = create_objectworld()
-
+if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
+    mdp_data, r, feature_data, mdp_params = create_gridworld()
+if worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
+    mdp_data, r, feature_data, true_feature_map, mdp_params = create_objectworld()
+else:
+    mdp_data, r, feature_data, mdp_params = create_gridworld()
 
 #Solve MDP
 print("\n... performing value iteration for v, q, logp and truep ...")
@@ -1142,12 +1158,12 @@ print("\n... done ...")
 #Sample paths
 print("\n... sampling paths from true R ...")
 example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
-print("\n... done ...")
+print("\n... done sampling", N, "paths ...")
 
 #initalise loss function
 NLL = NLLFunction()  # initialise NLL
 initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples, feature_data)  # calculate required variables
-initD = initD/10 #scale down
+initD = initD #scale down
 # assign constant class variable
 NLL.F = F
 NLL.muE = muE
@@ -1155,26 +1171,77 @@ NLL.mu_sa = mu_sa
 NLL.initD = initD
 NLL.mdp_data = mdp_data
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r, trueNLL, optimal_policy))  # Printline if LH is scalar
+print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
 
 
 #run single NN
 mynet = NonLinearNet(len(feature_data['splittable']))
-single_net, predictedR = run_single_NN(0.000001, "Adam", mynet, feature_data['splittable'])
-
+single_net, feature_weights, run_time = run_single_NN(0.0000000000001, "Adam", mynet, feature_data['splittable'])
 
 #calculate, format and print results
-if(predictedR.shape != (mdp_data['states'],5)):
+if(feature_weights.shape != (mdp_data['states'],5)):
     #convert to full reward
-    predictedR = torch.matmul(feature_data['splittable'], predictedR)
+    predictedR = torch.matmul(feature_data['splittable'], feature_weights)
     predictedR = predictedR.repeat((1, 5))
 predictedv, predictedq, predictedlogp, predictedP = linearvalueiteration(mdp_data, predictedR)
 predicted_mdp_solution = {'v': predictedv, 'q': predictedq, 'p': predictedP, 'logp': predictedlogp}
 predicted_optimal_policy = np.argmax(predictedP.detach().cpu().numpy(), axis=1)
-print("Predicted R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(predictedR, NLL.apply(predictedR, initD, mu_sa, muE, F, mdp_data), predicted_optimal_policy))  # Printline if LH is scalar
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r, trueNLL, optimal_policy))  # Printline if LH is scalar
+print("Predicted R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(predictedR.detach().cpu().numpy(), NLL.apply(predictedR, initD, mu_sa, muE, F, mdp_data), predicted_optimal_policy))  # Printline if LH is scalar
+print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
+
+if plots:
+    #plot heatmaps of rewards
+    scaler = MinMaxScaler() # define min max scaler
+    scaledR = scaler.fit_transform(r) # transform data
+    scaler = MinMaxScaler() # define min max scaler
+    scaledpredictedR = scaler.fit_transform(predictedR.detach().cpu().numpy()) # transform data
+    columnR = scaledR[:,0] #turn into column vector
+    gridR =  np.reshape(columnR, (int(math.sqrt(len(columnR))), int(math.sqrt(len(columnR))))) #reshape to grid
+    gridR = gridR * 100
+    columnpredictedR = scaledpredictedR[:,0] #turn into column vector
+    gridpredictedR = np.reshape(columnpredictedR, (int(math.sqrt(len(columnpredictedR))), int(math.sqrt(len(columnpredictedR))))) #reshape to grid
+    #plot as heatmaps
+    ax = sns.heatmap(gridR)
+    plt.show()
+    ax = sns.heatmap(gridpredictedR)
+    plt.show()
 
 
+
+irl_result = { #models IRL results
+    'r': predictedR,
+    'v': predictedv,
+    'p': predictedP,
+    'q': predictedq,
+    'r_itr': [predictedR],
+    'model_itr': [feature_weights],
+    'model_r_itr': [predictedR],
+    'p_itr': [predictedP],
+    'model_p_itr':[predictedP],
+    'time': run_time
+      
+}
+
+ 
+test_result = { #ground truth metrics
+    'irl_result': irl_result,
+    'true_r': r,
+    'example_samples': [example_samples],
+    'mdp_data': mdp_data,
+    'mdp_params': mdp_params,
+    'mdp_solution': mdp_solution,
+    'feature_data': feature_data
+}
+
+
+
+#call respective draw method
+if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
+    gwVisualise(test_result)
+elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
+    owvisualise(test_result)
+else:
+   gwVisualise(test_result)
 
 '''
 # run NN ensemble
