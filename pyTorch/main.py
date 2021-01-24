@@ -1091,7 +1091,7 @@ def run_single_NN(evdThreshold, optim_type, net, X):
          
         
         
-        if plots:
+        if NLL_EVD_plots:
             # plot
             f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
             ax1.plot(iterations, NLList)
@@ -1108,9 +1108,9 @@ def run_single_NN(evdThreshold, optim_type, net, X):
         return net, finalOutput, (time.time() - start_time)
 
 def create_gridworld():
-    print("\n ... generating gridworld MDP and intial R ...")
-    #mdp_params = {'n': 32, 'b': 4, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
-    mdp_params = {'n': 16, 'b': 2, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
+    print("\n... generating gridworld MDP and intial R ...")
+    mdp_params = {'n': 32, 'b': 4, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
+    #mdp_params = {'n': 16, 'b': 2, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
     mdp_data, r, feature_data = gridworldbuild(mdp_params)
     print("\n... done ...")
     return mdp_data, r, feature_data, mdp_params
@@ -1131,11 +1131,10 @@ def create_objectworld():
     return mdp_data, r, feature_data, true_feature_map, mdp_params
 
 
-
-
 worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
 
-plots = False 
+NLL_EVD_plots = True 
+heatmapplots = False
 
 N = 32 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
@@ -1189,7 +1188,7 @@ predicted_optimal_policy = np.argmax(predictedP.detach().cpu().numpy(), axis=1)
 print("Predicted R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(predictedR.detach().cpu().numpy(), NLL.apply(predictedR, initD, mu_sa, muE, F, mdp_data), predicted_optimal_policy))  # Printline if LH is scalar
 print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
 
-if plots:
+if heatmapplots:
     #plot heatmaps of rewards
     scaler = MinMaxScaler() # define min max scaler
     scaledR = scaler.fit_transform(r) # transform data
