@@ -34,21 +34,18 @@ def objectworldbuild(mdp_params):
     torch.manual_seed(mdp_params['seed'])
     np.random.seed(seed=mdp_params['seed'])
     #Build action mappings
-
-    sa_s = torch.zeros((mdp_params['n']**2,5,5), dtype=torch.int8)
-    sa_p = torch.zeros((mdp_params['n']**2,5,5), dtype=torch.int8)
+    sa_s = torch.zeros((mdp_params['n']**2,5,5), dtype=torch.int64)
+    sa_p = torch.zeros((mdp_params['n']**2,5,5), dtype=torch.int64)
     for y in range(mdp_params['n']):
-        for x in range(mdp_params['n']):    
-                   
+        for x in range(mdp_params['n']):   
             s = y*mdp_params['n']+x
             successors = torch.zeros((1,1,5))
             successors[0,0,0] = s
             successors[0,0,1] = ((min(mdp_params['n'],y+2)-1)*mdp_params['n']+x+1)-1
-            
             successors[0,0,2] = ((y)*mdp_params['n']+min(mdp_params['n'],x+2))-1
             successors[0,0,3] = ((max(1,y)-1)*mdp_params['n']+x+1)-1
             successors[0,0,4] = ((y)*mdp_params['n']+max(1,x))-1  
-            sa_s[s,:,:] = successors.repeat([1,5,1])
+            sa_s[s,:,:] = torch.tensor(np.tile(successors, (1,5,1)))
             sa_p[s,:,:] = torch.reshape(torch.eye(5,5)*mdp_params['determinism'] + (torch.ones((5,5)) - torch.eye(5,5)) * ((1.0-mdp_params['determinism'])/4.0), (1,5,5))
 
     #construct map
