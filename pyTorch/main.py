@@ -966,7 +966,7 @@ def run_single_NN(threshold, optim_type, net, X, initD, mu_sa, muE, F, mdp_data)
         finalOutput = None #store final est R
         loss = 1000 #init loss 
         diff = 1000 #init diff
-        epochs = 10 #no. epochs
+        epochs = 1 #no. epochs
         evd = 10 #init val
         lr = 0.1 #learning rate
 
@@ -1277,9 +1277,9 @@ def hyperparameter_search(num_samples=10, max_num_epochs=10, gpus_per_trial=2):
 if len(sys.argv[1]) > 0:
     worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
 
-NLL_EVD_plots = True 
+NLL_EVD_plots = False 
 heatmapplots = False
-final_figures = True
+final_figures = False
 N = 1000 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
 
