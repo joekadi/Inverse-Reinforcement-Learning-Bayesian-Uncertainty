@@ -39,6 +39,9 @@ import torchvision
 import torchvision.transforms as transforms
 from clearml import Task
 
+from clearml.automation import UniformParameterRange, UniformIntegerParameterRange
+from clearml.automation import HyperParameterOptimizer
+from clearml.automation.optuna import OptimizerOptuna
 
 from torch.utils.tensorboard import SummaryWriter
 tensorboard_writer = SummaryWriter('./tensorboard_logs')
@@ -1273,7 +1276,48 @@ def hyperparameter_search(num_samples=10, max_num_epochs=10, gpus_per_trial=2):
     test_acc = test_accuracy(best_trained_model, device)
     print("Best trial test set accuracy: {}".format(test_acc))
 '''
+def hyperparamsearch(TEMPLATE_TASK_ID):
+    task = Task.init(project_name='Hyperparameter Optimization with Optuna',
+                 task_name='Hyperparameter Search',
+                 task_type=Task.TaskTypes.optimizer)
+    optimizer = HyperParameterOptimizer(
+        base_task_id=TEMPLATE_TASK_ID,  # This is the experiment we want to optimize
+        # here we define the hyper-parameters to optimize
+        hyper_parameters=[
+            UniformIntegerParameterRange('number_of_epochs', min_value=2, max_value=12, step_size=2),
+            UniformParameterRange('base_lr', min_value=0.00025, max_value=0.01, step_size=0.00025),
+        ],
+        # setting the objective metric we want to maximize/minimize
+        objective_metric_title='evd',
+        objective_metric_series='total',
+        objective_metric_sign='max',  # maximize or minimize the objective metric
 
+        # setting optimizer - clearml supports GridSearch, RandomSearch, OptimizerBOHB and OptimizerOptuna
+        optimizer_class=OptimizerOptuna,
+        
+        # Configuring optimization parameters
+        execution_queue='dan_queue',  # queue to schedule the experiments for execution
+        max_number_of_concurrent_tasks=2,  # number of concurrent experiments
+        optimization_time_limit=60.,  # set the time limit for the optimization process
+        compute_time_limit=120,  # set the compute time limit (sum of execution time on all machines)
+        total_max_jobs=20,  # set the maximum number of experiments for the optimization. 
+                            # Converted to total number of iteration for OptimizerBOHB
+        min_iteration_per_job=15000,  # minimum number of iterations per experiment, till early stopping
+        max_iteration_per_job=150000,  # maximum number of iterations per experiment
+    )
+    optimizer.set_report_period(1)  # setting the time gap between two consecutive reports
+    optimizer.start()  
+    optimizer.wait()  # wait until process is done
+    optimizer.stop()  # make sure background optimization stopped
+
+
+    # optimization is completed, print the top performing experiments id
+    k = 3
+    top_exp = optimizer.get_top_experiments(top_k=k)
+    print('Top {} experiments are:'.format(k))
+    for n, t in enumerate(top_exp, 1):
+        print('Rank {}: task id={} |result={}'
+            .format(n, t.id, t.get_last_scalar_metrics()['accuracy']['total']['last']))
 
 if len(sys.argv) > 1:
     worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
@@ -1397,7 +1441,7 @@ if final_figures:
         gwVisualise(test_result)
 
 
-
+hyperparamsearch('d806711640374a74b6705489fa094e62')
 '''
 # run NN ensemble
 models_to_train = 10  # train this many models
