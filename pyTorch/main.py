@@ -39,19 +39,13 @@ import copy
 import torchvision
 import torchvision.transforms as transforms
 from clearml import Task
-
 from clearml.automation import UniformParameterRange, UniformIntegerParameterRange
 from clearml.automation import HyperParameterOptimizer
 from clearml.automation.optuna import OptimizerOptuna
-
 from torch.utils.tensorboard import SummaryWriter
 tensorboard_writer = SummaryWriter('./tensorboard_logs')
-
-
-print('torch version:', torch.__version__)
-
+#print('torch version:', torch.__version__)
 torch.set_printoptions(precision=5, sci_mode=False, threshold=100000)
-# default type to torch.float64
 torch.set_default_tensor_type(torch.DoubleTensor)
 np.set_printoptions(precision=5, threshold=100000, suppress=False)
 
@@ -548,7 +542,7 @@ NLL.mdp_data = mdp_data
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
 
-configuration_dict = {'number_of_epochs': 50, 'base_lr': 0.1, 'i2': 60, 'h1_out': 30, 'h2_out': 20} #set config params for clearml
+configuration_dict = {'number_of_epochs': 10, 'base_lr': 0.1, 'i2': 60, 'h1_out': 30, 'h2_out': 20} #set config params for clearml
 mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 60), configuration_dict.get('h1_out', 30), configuration_dict.get('h2_out', 20)) #config net
 
 #run single NN 
