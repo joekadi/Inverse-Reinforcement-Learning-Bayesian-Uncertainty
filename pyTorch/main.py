@@ -1274,7 +1274,7 @@ def hyperparameter_search(num_samples=10, max_num_epochs=10, gpus_per_trial=2):
     print("Best trial test set accuracy: {}".format(test_acc))
 '''
 
-if len(sys.argv[1]) > 0:
+if len(sys.argv) > 1:
     worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
 
 NLL_EVD_plots = False 
