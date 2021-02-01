@@ -44,7 +44,8 @@ from torch.utils.tensorboard import SummaryWriter
 tensorboard_writer = SummaryWriter('./tensorboard_logs')
 
 
-#print(torch.__version__)
+print('torch version:', torch.__version__)
+
 torch.set_printoptions(precision=5, sci_mode=False, threshold=100000)
 # default type to torch.float64
 torch.set_default_tensor_type(torch.DoubleTensor)

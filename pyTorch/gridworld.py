@@ -70,9 +70,15 @@ def gridworldfeatures(mdp_params, mdp_data):
     for y in range(mdp_params['n']):
         for x in range(mdp_params['n']):
             #Compute x and y split tables
-            xtable = torch.hstack( (torch.zeros(1,x), torch.ones(1, mdp_params['n']-(x+1))))
-            ytable = torch.hstack((torch.zeros(1,y), torch.ones(1, mdp_params['n']-(y+1))))
-            hold = torch.hstack((xtable, ytable))
+            #xtable = torch.hstack( (torch.zeros(1,x), torch.ones(1, mdp_params['n']-(x+1))))
+            xtable = np.hstack( (np.zeros((1,x)), np.ones((1, mdp_params['n']-(x+1)))) )
+            
+            #ytable = torch.hstack((torch.zeros(1,y), torch.ones(1, mdp_params['n']-(y+1))))
+            ytable = np.hstack((np.zeros((1,y)), np.ones((1, mdp_params['n']-(y+1)))))
+           
+            hold = np.hstack((xtable, ytable))
+            hold = torch.tensor(hold)
+            
             splittable[(y)*mdp_params['n']+x, :] = hold
 
     #Return feature data structure.
