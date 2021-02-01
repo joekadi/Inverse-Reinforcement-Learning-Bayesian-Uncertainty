@@ -27,6 +27,7 @@ from likelihood import *
 from gridworld import *
 from objectworld import *
 from linearvalueiteration import *
+from NNIRL import *
 import pprint
 from sampleexamples import *
 import numpy as np
@@ -918,191 +919,6 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
 
     return y_hats_test, model_weights
 
-def likelihood(r, initD, mu_sa, muE, F, mdp_data):
-        #Returns NLL w.r.t input r
-
-        '''
-        if(torch.is_tensor(r) == False):
-            r = torch.tensor(r) #cast to tensor
-        if(r.shape != (mdp_data['states'],5)):
-            #reformat to be in shape (states,actions)
-            r = torch.reshape(r, (int(mdp_data['states']),1))
-            r = r.repeat((1, 5))
-        '''
-
-        if(torch.is_tensor(r) == False):
-            r = torch.tensor(r) #cast to tensor
-        if(r.shape != (mdp_data['states'],5)):
-            #convert to full reward
-            r = torch.matmul(F, r)
-
-
-        #Solve MDP with current reward
-        v, q, logp, p = linearvalueiteration(mdp_data, r) 
-   
-        #Calculate likelihood from logp
-        likelihood = torch.empty(mu_sa.shape, requires_grad=True)
-
-
-        likelihood = torch.sum(torch.sum(logp*mu_sa)) #for scalar likelihood
-
-        #LH for each state as tensor size (states,1)
-        #mul = logp*mu_sa #hold
-        #likelihood = torch.sum(mul, dim=1)
-        #likelihood.requires_grad = True
-        
-      
-        return -likelihood
-
-def run_single_NN(threshold, optim_type, net, X, initD, mu_sa, muE, F, mdp_data, configuration_dict):
-        task = Task.init(project_name='MSci-Project', task_name='run_single_NN') #init task on ClearML
-
-        start_time = time.time() #to time execution
-        tester = testers() #to use testing functions
-
-        # lists for printing
-        NLList = []
-        iterations = []
-        evdList = []
-
-        i = 0 #track iterations
-        finalOutput = None #store final est R
-        loss = 1000 #init loss 
-        diff = 1000 #init diff
-        evd = 10 #init val
-        configuration_dict = task.connect(configuration_dict)  #enabling configuration override by clearml
-
-        if (optim_type == 'Adam'):
-            print('\nOptimising with torch.Adam\n')
-            optimizer = torch.optim.Adam(
-                net.parameters(), lr=configuration_dict.get('base_lr', 0.1), weight_decay=1e-2) #weight decay for l2 regularisation
-            #while(evd > threshold): #termination criteria: evd threshold
-            for p in range(configuration_dict.get('number_of_epochs', 3)): #termination criteria: no of iters
-            #while diff >= threshold: #termination criteria: loss diff
-                prevLoss = loss
-                net.zero_grad()
-                
-                output = torch.empty(len(X[0]), 1)
-                indexer = 0
-                for j in range(len(X[0])):
-                    thisR = net(X[:, j].view(-1, len(X[:, j])))
-                    output[indexer] = thisR
-                    indexer += 1
-                finalOutput = output
-
-                loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data) #use this line for custom gradient
-                #loss = likelihood(output, initD, mu_sa, muE, F, mdp_data) #use this line for auto gradient
-                #tester.checkgradients_NN(output, NLL) # check gradients
-                loss.backward()  # propagate grad through network
-                #nn.utils.clip_grad_norm_(net.parameters(), max_norm=2.0, norm_type=2)
-                evd = NLL.calculate_EVD(truep, torch.matmul(X, output))  # calc EVD
-                optimizer.step()
-
-                #printline to show est R
-                #print('{}: output:\n {} | EVD: {} | loss: {} '.format(i, torch.matmul(X, output).repeat(1, 5).detach().numpy(), evd, loss.detach().numpy()))
-
-                #printline to hide est R
-                print('{}: | EVD: {} | loss: {} | diff {}'.format(i, evd, loss.detach().numpy(), diff))
-                # store metrics for printing
-                NLList.append(loss.item())
-                iterations.append(i)
-                evdList.append(evd.item())
-                finaloutput = output
-                tensorboard_writer.add_scalar('loss', loss.detach().numpy(), i)
-                tensorboard_writer.add_scalar('evd', evd, i)
-                tensorboard_writer.add_scalar('diff', diff, i)
-
-                i += 1
-                diff = abs(prevLoss-loss)
-
-        else:
-            print('\nOptimising with torch.LBFGS\n')
-            optimizer = torch.optim.LBFGS(net.parameters(), lr=lr)
-            i = 0
-
-            def closure():
-                net.zero_grad()
-
-                # build output vector as reward for each state w.r.t its features
-                output = torch.empty(len(X[0]))
-                indexer = 0
-                for f in X[0]:
-                    thisR = net(f.view(-1, len(f)))
-                    output[indexer] = thisR
-                    indexer += 1
-
-                
-                # get loss from curr output
-                loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data)
-
-                # check gradients
-                #tester.checkgradients_NN(output, NLL)
-                #print('Output {} with grad fn {}'.format(output, output.grad_fn))
-                #print('Loss {} with grad fn {}'.format(loss, loss.grad_fn))
-
-                loss.backward()  # propagate grad through network
-                evd = NLL.calculate_EVD(truep, output)  # calc EVD
-                print('{}: output: {} | EVD: {} | loss: {} '.format(
-                    i, output.detach().numpy(), evd, loss.detach().numpy()))
-
-                # store metrics for printing
-                NLList.append(loss.item())
-                iterations.append(i)
-                evdList.append(evd.item())
-                finaloutput = output
-                i += 1
-
-                return loss
-
-            while(evd > evdThreshold):
-                optimizer.step(closure)
-
-                # Normalise data
-                #NLList = [float(i)/sum(NLList) for i in NLList]
-                #evdList = [float(i)/sum(evdList) for i in evdList]
-
-                # plot
-                f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
-                ax1.plot(iterations, NLList)
-                ax1.plot(iterations, NLList, 'r+')
-                ax1.set_title('NLL')
-
-                ax2.plot(iterations, evdList)
-                ax2.plot(iterations, evdList, 'r+')
-                ax2.set_title('Expected Value Diff')
-                plt.show()
-
-                # calculate metrics for printing
-                v, q, logp, thisp = linearvalueiteration(
-                    mdp_data, output.view(4, 1))  # to get policy under out R
-                thisoptimal_policy = np.argmax(
-                    thisp.detach().cpu().numpy(), axis=1)
-
-                print(
-                    '\nTrue R: \n{}\n - with optimal policy {}'.format(r[:, 0].view(4, 1), optimal_policy))
-                print('\nFinal Estimated R after 100 optim steps: \n{}\n - with optimal policy {}\n - avg EVD of {}'.format(
-                    finaloutput.view(4, 1), thisoptimal_policy, sum(evdList)/len(evdList)))
-         
-        PATH = './NN_IRL.pth'
-        torch.save(net.state_dict(), PATH)
-        tensorboard_writer.close()
-
-        if NLL_EVD_plots:
-            # plot
-            f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
-            ax1.plot(iterations, NLList)
-            ax1.plot(iterations, NLList, 'r+')
-            ax1.set_title('NLL')
-
-            ax2.plot(iterations, evdList)
-            ax2.plot(iterations, evdList, 'r+')
-            ax2.set_title('Expected Value Diff')
-            plt.show()
-        
-        
-        print("\nruntime: --- %s seconds ---\n" % (time.time() - start_time) )
-        return net, finalOutput, (time.time() - start_time)
-
 def create_gridworld():
     print("\n... generating gridworld MDP and intial R ...")
    # mdp_params = {'n': 16, 'b': 4, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
@@ -1126,152 +942,6 @@ def create_objectworld():
     print("\n... done ...")
     return mdp_data, r, feature_data, true_feature_map, mdp_params
 
-'''
-def train_cifar(config, checkpoint_dir=None, data_dir=None, initD=initD, mu_sa=mu_sa, muE=muE, features=feature_data['splittable'], mdp_data=mdp_data):
-    net = nonlinearnn(config["l1"], config["l2"])
-
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = "cuda:0"
-        if torch.cuda.device_count() > 1:
-            net = nn.DataParallel(net)
-    net.to(device)
-
-    criterion = NLL.apply()
-    optimizer = torch.optim.Adam(net.parameters(), lr=config["lr"], momentum=0.9) #, weight_decay=1e-2)
-    #optimizer = optim.SGD(net.parameters(), )
-
-    if checkpoint_dir:
-        model_state, optimizer_state = torch.load(
-            os.path.join(checkpoint_dir, "checkpoint"))
-        net.load_state_dict(model_state)
-        optimizer.load_state_dict(optimizer_state)
-
-    trainset, testset = features, features
-
-    test_abs = int(len(trainset) * 0.8)
-    train_subset, val_subset = random_split(
-        trainset, [test_abs, len(trainset) - test_abs])
-
-    trainloader = torch.utils.data.DataLoader(
-        train_subset,
-        batch_size=int(config["batch_size"]),
-        shuffle=True,
-        num_workers=8)
-    valloader = torch.utils.data.DataLoader(
-        val_subset,
-        batch_size=int(config["batch_size"]),
-        shuffle=True,
-        num_workers=8)
-    train_evdList = []
-    for epoch in range(10):  # loop over the dataset multiple times
-        running_loss = 0.0
-        epoch_steps = 0
-        for i, data in enumerate(trainloader, 0):
-            # get the inputs; data is a list of [inputs, labels]
-            # zero the parameter gradients
-            optimizer.zero_grad()
-
-            # forward + backward + optimize
-            outputs = torch.empty(len(features[0]), 1)
-            indexer = 0
-            for j in range(len(features[0])):
-                thisR = net(features[:, j].view(-1, len(features[:, j])))
-                outputs[indexer] = thisR
-                indexer += 1
-               
-
-            loss = NLL.apply(outputs, initD, mu_sa, muE, F, mdp_data)
-            loss.backward()
-            evd = NLL.calculate_EVD(truep, torch.matmul(outputs))
-            optimizer.step()
-            train_evdList.append(evd.item())
-
-            # print statistics
-            running_loss += loss.item()
-            epoch_steps += 1
-            if i % 2000 == 1999:  # print every 2000 mini-batches
-                print("[%d, %5d] loss: %.3f" % (epoch + 1, i + 1,
-                                                running_loss / epoch_steps))
-                running_loss = 0.0
-
-        # Validation loss
-        val_loss = 0.0
-        val_steps = 0
-        total = 0
-        correct = 0
-        test_evdList = []
-        for i, data in enumerate(valloader, 0):
-            with torch.no_grad():
-                
-
-                outputs = torch.empty(len(features[0]), 1)
-                indexer = 0
-                for j in range(len(features[0])):
-                    thisR = net(features[:, j].view(-1, len(features[:, j])))
-                    outputs[indexer] = thisR
-                    indexer += 1
-
-                evd = NLL.calculate_EVD(truep, torch.matmul(outputs))
-                loss = NLL.apply(outputs, initD, mu_sa, muE, F, mdp_data)
-                val_loss += loss.cpu().numpy()
-                val_steps += 1
-                test_evdList.append(evd.item())
-
-        with tune.checkpoint_dir(epoch) as checkpoint_dir:
-            path = os.path.join(checkpoint_dir, "checkpoint")
-            torch.save((net.state_dict(), optimizer.state_dict()), path)
-
-        tune.report(loss=(val_loss / val_steps), accuracy= test_evdList[-10:]/10)
-    print("Finished Training")
-
-def hyperparameter_search(num_samples=10, max_num_epochs=10, gpus_per_trial=2):
-
-    config = {
-        "l1": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
-        "l2": tune.sample_from(lambda _: 2 ** np.random.randint(2, 9)),
-        "lr": tune.loguniform(1e-4, 1e-1),
-        "batch_size": tune.choice([2, 4, 8, 16])
-    }
-    scheduler = ASHAScheduler(
-        metric="loss",
-        mode="min",
-        max_t=max_num_epochs,
-        grace_period=1,
-        reduction_factor=2)
-    reporter = CLIReporter(
-        # parameter_columns=["l1", "l2", "lr", "batch_size"],
-        metric_columns=["loss", "accuracy", "training_iteration"])
-    result = tune.run(
-        partial(train_cifar, data_dir=data_dir),
-        resources_per_trial={"cpu": 2, "gpu": gpus_per_trial},
-        config=config,
-        num_samples=num_samples,
-        scheduler=scheduler,
-        progress_reporter=reporter)
-
-    best_trial = result.get_best_trial("loss", "min", "last")
-    print("Best trial config: {}".format(best_trial.config))
-    print("Best trial final validation loss: {}".format(
-        best_trial.last_result["loss"]))
-    print("Best trial final validation accuracy: {}".format(
-        best_trial.last_result["accuracy"]))
-
-    best_trained_model = nonlinearnn(best_trial.config["l1"], best_trial.config["l2"])
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = "cuda:0"
-        if gpus_per_trial > 1:
-            best_trained_model = nn.DataParallel(best_trained_model)
-    best_trained_model.to(device)
-
-    best_checkpoint_dir = best_trial.checkpoint.value
-    model_state, optimizer_state = torch.load(os.path.join(best_checkpoint_dir, "checkpoint"))
-    best_trained_model.load_state_dict(model_state)
-
-    test_acc = test_accuracy(best_trained_model, device)
-    print("Best trial test set accuracy: {}".format(test_acc))
-'''
 
 if len(sys.argv) > 1:
     worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
@@ -1320,12 +990,11 @@ NLL.mdp_data = mdp_data
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
 
-configuration_dict = {'number_of_epochs': 20, 'base_lr': 0.1, 'i2': 60, 'h1_out': 30, 'h2_out': 20} #set config params for clearml
-#run single NN 
-mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 60), configuration_dict.get('h1_out', 30), configuration_dict.get('h2_out', 20))
-single_net, feature_weights, run_time = run_single_NN(0.001, "Adam", mynet, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict)
+configuration_dict = {'number_of_epochs': 2, 'base_lr': 0.1, 'i2': 60, 'h1_out': 30, 'h2_out': 20} #set config params for clearml
+mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 60), configuration_dict.get('h1_out', 30), configuration_dict.get('h2_out', 20)) #config net
 
-#hyperparameter_search(num_samples=10, max_num_epochs=10, gpus_per_trial=0)
+#run single NN 
+single_net, feature_weights, run_time = run_single_NN(0.001, "Adam", mynet, NLL, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots)
 
 #calculate, format and print results
 if(feature_weights.shape != (mdp_data['states'],5)):
@@ -1355,7 +1024,6 @@ if heatmapplots:
     plt.show()
     ax = sns.heatmap(gridpredictedR)
     plt.show()
-
 
 #plot final figures
 if final_figures:
