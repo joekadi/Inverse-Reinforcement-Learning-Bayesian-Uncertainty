@@ -1,8 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-
-
 class NonLinearNet(nn.Module):
 	def __init__(self, in_features):
 		super().__init__() #initialise nn.module and anything else in __init__
