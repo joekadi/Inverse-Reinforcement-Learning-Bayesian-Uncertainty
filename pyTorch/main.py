@@ -954,7 +954,7 @@ def likelihood(r, initD, mu_sa, muE, F, mdp_data):
       
         return -likelihood
 
-def run_single_NN(threshold, optim_type, net, X, initD, mu_sa, muE, F, mdp_data):
+def run_single_NN(threshold, optim_type, net, X, initD, mu_sa, muE, F, mdp_data, configuration_dict):
         task = Task.init(project_name='MSci-Project', task_name='run_single_NN') #init task on ClearML
 
         start_time = time.time() #to time execution
@@ -970,8 +970,6 @@ def run_single_NN(threshold, optim_type, net, X, initD, mu_sa, muE, F, mdp_data)
         loss = 1000 #init loss 
         diff = 1000 #init diff
         evd = 10 #init val
-
-        configuration_dict = {'number_of_epochs': 20, 'base_lr': 0.1} #set config params for clearml
         configuration_dict = task.connect(configuration_dict)  #enabling configuration override by clearml
 
         if (optim_type == 'Adam'):
@@ -1322,10 +1320,10 @@ NLL.mdp_data = mdp_data
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
 
-
-#run single NN
-mynet = NonLinearNet(len(feature_data['splittable']))
-single_net, feature_weights, run_time = run_single_NN(0.001, "Adam", mynet, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data)
+configuration_dict = {'number_of_epochs': 20, 'base_lr': 0.1, 'i2': 60, 'h1_out': 30, 'h2_out': 20} #set config params for clearml
+#run single NN 
+mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 60), configuration_dict.get('h1_out', 30), configuration_dict.get('h2_out', 20))
+single_net, feature_weights, run_time = run_single_NN(0.001, "Adam", mynet, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict)
 
 #hyperparameter_search(num_samples=10, max_num_epochs=10, gpus_per_trial=0)
 

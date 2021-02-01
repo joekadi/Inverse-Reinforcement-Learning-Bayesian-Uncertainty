@@ -13,8 +13,9 @@ optimizer = HyperParameterOptimizer(
     base_task_id=TEMPLATE_TASK_ID,  # This is the experiment we want to optimize
     # here we define the hyper-parameters to optimize
     hyper_parameters=[
-        UniformIntegerParameterRange('number_of_epochs', min_value=2, max_value=12, step_size=2),
-        UniformParameterRange('base_lr', min_value=0.00025, max_value=0.01, step_size=0.00025),
+        UniformIntegerParameterRange('i2', min_value=26, max_value=32, step_size=2),
+        UniformIntegerParameterRange('h1_out', min_value=10, max_value=16, step_size=2),
+        UniformIntegerParameterRange('h2_out', min_value=2, max_value=8, step_size=2),
     ],
     # setting the objective metric we want to maximize/minimize
     objective_metric_title='evd',
@@ -26,7 +27,7 @@ optimizer = HyperParameterOptimizer(
     
     # Configuring optimization parameters
     execution_queue='default',  # queue to schedule the experiments for execution
-    max_number_of_concurrent_tasks=2,  # number of concurrent experiments
+    max_number_of_concurrent_tasks=4,  # number of concurrent experiments
     optimization_time_limit=60.,  # set the time limit for the optimization process
     compute_time_limit=120,  # set the compute time limit (sum of execution time on all machines)
     total_max_jobs=20,  # set the maximum number of experiments for the optimization. 
