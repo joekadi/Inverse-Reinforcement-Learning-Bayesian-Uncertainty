@@ -969,19 +969,17 @@ def run_single_NN(threshold, optim_type, net, X, initD, mu_sa, muE, F, mdp_data)
         finalOutput = None #store final est R
         loss = 1000 #init loss 
         diff = 1000 #init diff
-        epochs = 1 #no. epochs
         evd = 10 #init val
-        lr = 0.1 #learning rate
 
-        configuration_dict = {'number_of_epochs': epochs, 'base_lr': lr} #set config params for clearml
+        configuration_dict = {'number_of_epochs': 3, 'base_lr': 0.1} #set config params for clearml
         configuration_dict = task.connect(configuration_dict)  #enabling configuration override by clearml
 
         if (optim_type == 'Adam'):
             print('\nOptimising with torch.Adam\n')
             optimizer = torch.optim.Adam(
-                net.parameters(), lr=lr, weight_decay=1e-2) #weight decay for l2 regularisation
+                net.parameters(), lr=configuration_dict.get('base_lr', 0.1), weight_decay=1e-2) #weight decay for l2 regularisation
             #while(evd > threshold): #termination criteria: evd threshold
-            for p in range(epochs): #termination criteria: no of iters
+            for p in range(configuration_dict.get('number_of_epochs', 3)): #termination criteria: no of iters
             #while diff >= threshold: #termination criteria: loss diff
                 prevLoss = loss
                 net.zero_grad()
