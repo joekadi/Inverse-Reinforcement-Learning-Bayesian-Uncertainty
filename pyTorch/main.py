@@ -1296,7 +1296,7 @@ def hyperparamsearch(TEMPLATE_TASK_ID):
         optimizer_class=OptimizerOptuna,
         
         # Configuring optimization parameters
-        execution_queue='dan_queue',  # queue to schedule the experiments for execution
+        execution_queue='default',  # queue to schedule the experiments for execution
         max_number_of_concurrent_tasks=2,  # number of concurrent experiments
         optimization_time_limit=60.,  # set the time limit for the optimization process
         compute_time_limit=120,  # set the compute time limit (sum of execution time on all machines)
