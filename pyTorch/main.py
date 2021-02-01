@@ -1277,7 +1277,7 @@ def hyperparameter_search(num_samples=10, max_num_epochs=10, gpus_per_trial=2):
     print("Best trial test set accuracy: {}".format(test_acc))
 '''
 def hyperparamsearch(TEMPLATE_TASK_ID):
-    task = Task.init(project_name='MSci-Project',
+    task = Task.create(project_name='MSci-Project',
                  task_name='Hyperparameter Search',
                  task_type=Task.TaskTypes.optimizer)
     optimizer = HyperParameterOptimizer(
