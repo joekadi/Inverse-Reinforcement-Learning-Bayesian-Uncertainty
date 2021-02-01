@@ -1274,8 +1274,12 @@ def hyperparameter_search(num_samples=10, max_num_epochs=10, gpus_per_trial=2):
     print("Best trial test set accuracy: {}".format(test_acc))
 '''
 
+
 if len(sys.argv) > 1:
     worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
+    user_input = True
+else:
+    user_input = False
 
 NLL_EVD_plots = False 
 heatmapplots = False
@@ -1283,11 +1287,12 @@ final_figures = False
 N = 1000 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
 
-#generate mdp and R
-if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
-    mdp_data, r, feature_data, mdp_params = create_gridworld()
-elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
-    mdp_data, r, feature_data, true_feature_map, mdp_params = create_objectworld()
+if(user_input):
+    #generate mdp and R
+    if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
+        mdp_data, r, feature_data, mdp_params = create_gridworld()
+    elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
+        mdp_data, r, feature_data, true_feature_map, mdp_params = create_objectworld()
 else:
     mdp_data, r, feature_data, mdp_params = create_gridworld()
 
