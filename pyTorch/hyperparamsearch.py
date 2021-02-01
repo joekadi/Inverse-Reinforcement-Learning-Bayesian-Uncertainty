@@ -6,7 +6,7 @@ from clearml.automation import UniformParameterRange, UniformIntegerParameterRan
 from clearml.automation import HyperParameterOptimizer
 from clearml.automation.optuna import OptimizerOptuna
 TEMPLATE_TASK_ID = str(sys.argv[1])
-task = Task.create(project_name='MSci-Project',
+task = Task.init(project_name='MSci-Project',
                 task_name='Hyperparameter Search',
                 task_type=Task.TaskTypes.optimizer)
 optimizer = HyperParameterOptimizer(

@@ -264,4 +264,18 @@ def cartaverage(tree,feature_data):
 
 #def draw(r,p,g,mdp_params,mdp_data,feature_data,model):
 
+def create_objectworld():
+    print("\n ... generating objectworld MDP and intial R ...")
+    mdp_params = {'n': 32, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.9, 'seed': 0, 'r_tree': None}
+    step = mdp_params['c1'] + mdp_params['c2']
+    r_tree = {'type': 1, 'test':1+step*2, 'total_leaves':3,           # Test distance to c1 1 shape
+        'ltTree':{'type':0, 'index': 0,'mean':[0,0,0,0,0]},           # Neutral reward for being elsewhere
+        'gtTree': {'type':1,'test':2+step*1,'total_leaves':2,         # Test distance to c1 2 shape
+            'gtTree':{'type':0, 'index':1,'mean':[1,1,1,1,1]},        # Reward for being close
+            'ltTree':{'type':0,'index':2,'mean':[-2,-2,-2,-2,-2]}}}   # Penalty otherwise
+    mdp_params['r_tree'] = r_tree,
+   
+    mdp_data, r, feature_data, true_feature_map = objectworldbuild(mdp_params)
+    print("\n... done ...")
+    return mdp_data, r, feature_data, true_feature_map, mdp_params
 
