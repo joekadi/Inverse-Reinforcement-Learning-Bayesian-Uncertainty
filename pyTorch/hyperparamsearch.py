@@ -44,10 +44,9 @@ optimizer.stop()  # make sure background optimization stopped
 k = 3
 top_exp = optimizer.get_top_experiments(top_k=k)
 print('Top {} experiments are:'.format(k))
+
+'''
 for n, t in enumerate(top_exp, 1):
     print('Rank {}: task id={} |result={}'
         .format(n, t.id, t.get_last_scalar_metrics()['accuracy']['total']['last']))
-
-if len(sys.argv) > 1:
-    
-    worldtype = str(sys.argv[1]) #benc
+'''

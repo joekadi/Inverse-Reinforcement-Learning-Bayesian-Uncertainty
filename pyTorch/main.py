@@ -955,7 +955,7 @@ def likelihood(r, initD, mu_sa, muE, F, mdp_data):
         return -likelihood
 
 def run_single_NN(threshold, optim_type, net, X, initD, mu_sa, muE, F, mdp_data):
-        task = Task.init(project_name='MSci-Project', task_name='Single NN IRL Regression') #init task on ClearML
+        task = Task.init(project_name='MSci-Project', task_name='run_single_NN') #init task on ClearML
 
         start_time = time.time() #to time execution
         tester = testers() #to use testing functions
@@ -971,7 +971,7 @@ def run_single_NN(threshold, optim_type, net, X, initD, mu_sa, muE, F, mdp_data)
         diff = 1000 #init diff
         evd = 10 #init val
 
-        configuration_dict = {'number_of_epochs': 3, 'base_lr': 0.1} #set config params for clearml
+        configuration_dict = {'number_of_epochs': 20, 'base_lr': 0.1} #set config params for clearml
         configuration_dict = task.connect(configuration_dict)  #enabling configuration override by clearml
 
         if (optim_type == 'Adam'):
