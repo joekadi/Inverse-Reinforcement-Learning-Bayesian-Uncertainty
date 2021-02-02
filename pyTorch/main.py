@@ -503,7 +503,7 @@ else:
 
 NLL_EVD_plots = False 
 heatmapplots = False
-final_figures = False
+final_figures = True
 N = 1000 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
 
