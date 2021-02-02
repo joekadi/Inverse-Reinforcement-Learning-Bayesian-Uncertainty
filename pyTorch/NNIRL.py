@@ -77,7 +77,7 @@ def likelihood(r, initD, mu_sa, muE, F, mdp_data):
 
 def run_single_NN(threshold, optim_type, net, NLL, X, initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots):
 
-    task = Task.init(project_name='MSci-Project', task_name='run_single_NN') #init task on ClearML
+    task = Task.init(project_name='MSci-Project', task_name='NNIRL Run') #init task on ClearML
     configuration_dict = task.connect(configuration_dict)  #enabling configuration override by clearml
 
     start_time = time.time() #to time execution
