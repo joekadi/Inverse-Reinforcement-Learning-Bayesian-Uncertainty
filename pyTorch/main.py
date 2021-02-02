@@ -504,7 +504,7 @@ else:
 NLL_EVD_plots = False 
 heatmapplots = False
 final_figures = True
-N = 1000 #number of sampled trajectories
+N = 16 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
 
 if(user_input):
@@ -540,7 +540,7 @@ NLL.mu_sa = mu_sa
 NLL.initD = initD
 NLL.mdp_data = mdp_data
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
+#print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
 
 configuration_dict = {'number_of_epochs': 100, 'base_lr': 0.01, 'i2': 60, 'h1_out': 30, 'h2_out': 20} #set config params for clearml
 mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 60), configuration_dict.get('h1_out', 30), configuration_dict.get('h2_out', 20)) #config net
