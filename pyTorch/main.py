@@ -38,7 +38,6 @@ import math as math
 import copy 
 import torchvision
 import torchvision.transforms as transforms
-from clearml import Task
 from clearml.automation import UniformParameterRange, UniformIntegerParameterRange
 from clearml.automation import HyperParameterOptimizer
 from clearml.automation.optuna import OptimizerOptuna
@@ -542,7 +541,7 @@ NLL.mdp_data = mdp_data
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 #print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
 
-configuration_dict = {'number_of_epochs': 100, 'base_lr': 0.01, 'i2': 60, 'h1_out': 30, 'h2_out': 20} #set config params for clearml
+configuration_dict = {'number_of_epochs': 20, 'base_lr': 0.034999, 'i2': 28, 'h1_out': 10, 'h2_out': 6} #set config params for clearml
 mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 60), configuration_dict.get('h1_out', 30), configuration_dict.get('h2_out', 20)) #config net
 
 #run single NN 
@@ -614,6 +613,8 @@ if final_figures:
             owvisualise(test_result)
     else:
         gwVisualise(test_result)
+
+
 
 
 '''
