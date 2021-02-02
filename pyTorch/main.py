@@ -504,7 +504,7 @@ else:
 NLL_EVD_plots = False 
 heatmapplots = False
 final_figures = True
-N = 16 #number of sampled trajectories
+N = 100 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
 
 if(user_input):
