@@ -607,10 +607,11 @@ if final_figures:
 
 
     #call respective draw method
-    if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
-        gwVisualise(test_result)
-    elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
-        owvisualise(test_result)
+    if(user_input):
+        if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
+            gwVisualise(test_result)
+        elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
+            owvisualise(test_result)
     else:
         gwVisualise(test_result)
 
