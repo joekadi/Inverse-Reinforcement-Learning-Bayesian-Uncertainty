@@ -689,4 +689,4 @@ def run_single_NN():
     return net, finalOutput, (time.time() - start_time)
 
 
-run_single_NN()
+#run_single_NN()
