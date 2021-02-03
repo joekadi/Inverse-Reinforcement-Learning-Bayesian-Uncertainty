@@ -542,7 +542,7 @@ trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 #print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
 #Optim config2: 'base_lr': 0.034999, 'i2': 28, 'h1_out': 10, 'h2_out': 6
 #Optim config1: base_lr=0.07500000000000001 h1_out=16 h2_out=10 i2=28
-configuration_dict = {'number_of_epochs': 100, 'base_lr': 0.07500000000000001, 'i2': 28, 'h1_out': 16, 'h2_out': 10} #set config params for clearml
+configuration_dict = {'number_of_epochs': 1, 'base_lr': 0.07500000000000001, 'i2': 28, 'h1_out': 16, 'h2_out': 10} #set config params for clearml
 mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 28), configuration_dict.get('h1_out', 16), configuration_dict.get('h2_out', 10)) #config net
 
 #run single NN 
@@ -614,8 +614,6 @@ if final_figures:
             owvisualise(test_result)
     else:
         gwVisualise(test_result)
-
-
 
 
 '''

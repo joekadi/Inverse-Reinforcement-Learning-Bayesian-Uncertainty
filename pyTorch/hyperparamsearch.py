@@ -7,7 +7,7 @@ from clearml.automation import HyperParameterOptimizer
 from clearml.automation.optimization import RandomSearch
 from clearml.automation.optuna import OptimizerOptuna
 TEMPLATE_TASK_ID = str(sys.argv[1])
-task = Task.create(project_name='MSci-Project',
+task = Task.init(project_name='MSci-Project',
                 task_name='NN Hyperparameter Search w.r.t minimising loss',
                 task_type=Task.TaskTypes.optimizer)
 optimizer = HyperParameterOptimizer(

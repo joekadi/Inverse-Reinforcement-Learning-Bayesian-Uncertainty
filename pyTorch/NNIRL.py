@@ -99,8 +99,8 @@ def run_single_NN(threshold, optim_type, net, NLL, X, initD, mu_sa, muE, F, mdp_
         optimizer = torch.optim.Adam(
             net.parameters(), lr=configuration_dict.get('base_lr', 0.07500000000000001), weight_decay=1e-2) #weight decay for l2 regularisation
         #while(evd > threshold): #termination criteria: evd threshold
-        #for p in range(configuration_dict.get('number_of_epochs', 3)): #termination criteria: no of iters
-        while diff >= threshold: #termination criteria: loss diff
+        for p in range(configuration_dict.get('number_of_epochs', 3)): #termination criteria: no of iters
+       # while diff >= threshold: #termination criteria: loss diff
             prevLoss = loss
             net.zero_grad()
             
