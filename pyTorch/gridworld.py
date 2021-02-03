@@ -66,7 +66,7 @@ def gridworldfeatures(mdp_params, mdp_data):
             stateadjacency[s, mdp_data['sa_s'][s,a,0].item()] = 1
 
     #Construct split table
-    splittable = torch.zeros(int(mdp_data['states']), int((mdp_params['n']-1)*2))
+    splittable = torch.zeros(int(mdp_data['states']), int((mdp_params['n']-1)*2), dtype=torch.double)
     for y in range(mdp_params['n']):
         for x in range(mdp_params['n']):
             #Compute x and y split tables

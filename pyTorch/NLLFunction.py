@@ -207,7 +207,6 @@ class NLLFunction(torch.autograd.Function):
 
         return -dr, None, None, None, None, None #return -dr for descent 
     
-
     def calculate_EVD(self, trueP, currR):
         if(currR.shape != (len(currR),5)):
             currR = currR.repeat((1, 5))

@@ -36,8 +36,14 @@ from clearml.automation import UniformParameterRange, UniformIntegerParameterRan
 from clearml.automation import HyperParameterOptimizer
 from clearml.automation.optuna import OptimizerOptuna
 
+import pickle
+
 from torch.utils.tensorboard import SummaryWriter
 tensorboard_writer = SummaryWriter('./tensorboard_logs')
+
+torch.set_printoptions(precision=5, sci_mode=False, threshold=100000)
+torch.set_default_tensor_type(torch.DoubleTensor)
+np.set_printoptions(precision=5, threshold=100000, suppress=False)
 
 def likelihood(r, initD, mu_sa, muE, F, mdp_data):
     #Returns NLL w.r.t input r
@@ -75,9 +81,10 @@ def likelihood(r, initD, mu_sa, muE, F, mdp_data):
     
     return -likelihood
 
+'''
 def run_single_NN(threshold, optim_type, net, NLL, X, initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots):
 
-    task = Task.init(project_name='MSci-Project', task_name='NNIRL Run') #init task on ClearML
+    task = Task.init(project_name='MSci-Project', task_name='NNIRL run from main') #init task on ClearML
     configuration_dict = task.connect(configuration_dict)  #enabling configuration override by clearml
 
     start_time = time.time() #to time execution
@@ -160,6 +167,8 @@ def run_single_NN(threshold, optim_type, net, NLL, X, initD, mu_sa, muE, F, mdp_
     
     print("\nruntime: --- %s seconds ---\n" % (time.time() - start_time) )
     return net, finalOutput, (time.time() - start_time)
+
+'''
 
 def ensemble_selector(loss_function, optim_for_loss, y_hats, X, init_size=1,
                       replacement=True, max_iter=100):
@@ -567,4 +576,118 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
 
     return y_hats_test, model_weights
 
+def run_single_NN():
 
+    task = Task.init(project_name='MSci-Project', task_name='NNIRL Run') #init task on ClearML
+   
+    #load variables from file
+    open_file = open("NNIRL_param_list.pkl", "rb")
+    NNIRL_param_list = pickle.load(open_file)
+    open_file.close()
+    threshold = NNIRL_param_list[0]
+    optim_type = NNIRL_param_list[1]
+    net = NNIRL_param_list[2]
+    X = NNIRL_param_list[3]
+    initD = NNIRL_param_list[4]
+    mu_sa = NNIRL_param_list[5]
+    muE = NNIRL_param_list[6]
+    F = NNIRL_param_list[7]
+    #F = F.type(torch.DoubleTensor)
+    mdp_data = NNIRL_param_list[8]
+    configuration_dict = NNIRL_param_list[9]
+    truep = NNIRL_param_list[10] 
+    NLL_EVD_plots = NNIRL_param_list[11]
+    NLL = NLLFunction()  # initialise NLL
+    #assign constants
+    NLL.F = F
+    NLL.muE = muE
+    NLL.mu_sa = mu_sa
+    NLL.initD = initD
+    NLL.mdp_data = mdp_data
+
+    configuration_dict = task.connect(configuration_dict)  #enabling configuration override by clearml
+    print('threshold should be 0.004', threshold)
+    os._exit(1)
+    start_time = time.time() #to time execution
+    #tester = testers() #to use testing functions
+
+    # lists for printing
+    NLList = []
+    iterations = []
+    evdList = []
+
+    i = 0 #track iterations
+    finalOutput = None #store final est R
+    loss = 1000 #init loss 
+    diff = 1000 #init diff
+    evd = 10 #init val
+
+    if (optim_type == 'Adam'):
+        print('\nOptimising with torch.Adam\n')
+        optimizer = torch.optim.Adam(
+            net.parameters(), lr=configuration_dict.get('base_lr', 0.07500000000000001), weight_decay=1e-2) #weight decay for l2 regularisation
+        #while(evd > threshold): #termination criteria: evd threshold
+        for p in range(configuration_dict.get('number_of_epochs', 3)): #termination criteria: no of iters in config dict
+        #while diff >= threshold: #termination criteria: loss diff
+            prevLoss = loss
+            net.zero_grad()
+            
+            output = torch.empty(len(X[0]), 1, dtype=torch.double)
+            indexer = 0
+            for j in range(len(X[0])):
+                thisR = net(X[:, j].view(-1, len(X[:, j])))
+                output[indexer] = thisR
+                indexer += 1
+            finalOutput = output
+
+            loss = NLL.apply(output, initD, mu_sa, muE, F, mdp_data) #use this line for custom gradient
+            #loss = likelihood(output, initD, mu_sa, muE, F, mdp_data) #use this line for auto gradient
+            #tester.checkgradients_NN(output, NLL) # check gradients
+            loss.backward()  # propagate grad through network
+            #nn.utils.clip_grad_norm_(net.parameters(), max_norm=2.0, norm_type=2)
+            evd = NLL.calculate_EVD(truep, torch.matmul(X, output))  # calc EVD
+            optimizer.step()
+
+            #printline to show est R
+            #print('{}: output:\n {} | EVD: {} | loss: {} '.format(i, torch.matmul(X, output).repeat(1, 5).detach().numpy(), evd, loss.detach().numpy()))
+
+            #printline to hide est R
+            print('{}: | EVD: {} | loss: {} | diff {}'.format(i, evd, loss.detach().numpy(), diff))
+            # store metrics for printing
+            NLList.append(loss.item())
+            iterations.append(i)
+            evdList.append(evd.item())
+            finaloutput = output
+            tensorboard_writer.add_scalar('loss', loss.detach().numpy(), i)
+            tensorboard_writer.add_scalar('evd', evd, i)
+            tensorboard_writer.add_scalar('diff', diff, i)
+
+            i += 1
+            diff = abs(prevLoss-loss)
+
+    else:
+        print('\implement LBFGS\n')
+        
+        
+    PATH = './NN_IRL.pth'
+    torch.save(net.state_dict(), PATH)
+    tensorboard_writer.close()
+
+    if NLL_EVD_plots:
+        # plot
+        f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+        ax1.plot(iterations, NLList)
+        ax1.plot(iterations, NLList, 'r+')
+        ax1.set_title('NLL')
+
+        ax2.plot(iterations, evdList)
+        ax2.plot(iterations, evdList, 'r+')
+        ax2.set_title('Expected Value Diff')
+        plt.show()
+    
+    
+    print("\nruntime: --- %s seconds ---\n" % (time.time() - start_time) )
+    return net, finalOutput, (time.time() - start_time)
+
+
+run_single_NN()
