@@ -540,9 +540,10 @@ NLL.initD = initD
 NLL.mdp_data = mdp_data
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 #print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
-
-configuration_dict = {'number_of_epochs': 100, 'base_lr': 0.034999, 'i2': 28, 'h1_out': 10, 'h2_out': 6} #set config params for clearml
-mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 60), configuration_dict.get('h1_out', 30), configuration_dict.get('h2_out', 20)) #config net
+#Optim config2: 'base_lr': 0.034999, 'i2': 28, 'h1_out': 10, 'h2_out': 6
+#Optim config1: base_lr=0.07500000000000001 h1_out=16 h2_out=10 i2=28
+configuration_dict = {'number_of_epochs': 100, 'base_lr': 0.07500000000000001, 'i2': 28, 'h1_out': 16, 'h2_out': 10} #set config params for clearml
+mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 28), configuration_dict.get('h1_out', 16), configuration_dict.get('h2_out', 10)) #config net
 
 #run single NN 
 single_net, feature_weights, run_time = run_single_NN(0.001, "Adam", mynet, NLL, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots)
