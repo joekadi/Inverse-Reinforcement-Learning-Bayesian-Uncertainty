@@ -39,8 +39,12 @@ def sampleexamples(N,T, mdp_solution, mdp_data):
     action = None
     for i in range(N):
        # s = torch.ceil(torch.randn(1,1)*mdp_data['states']) #sample intial states
+        
         s = math.ceil(random.uniform(0, 1)*mdp_data['states'])
+        #while s==34: #or s==12 or s==64: #never these states
+            #s = math.ceil(random.uniform(0, 1)*mdp_data['states'])
         s = int(s-1) #for 0 index
+
         path = [None] * T
         #print("initial state {}".format(s))
         #run sample trajectory

@@ -578,8 +578,9 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
 
 def run_single_NN():
 
-    task = Task.init(project_name='MSci-Project', task_name='NNIRL Run') #init task on ClearML
-   
+    task = Task.init(project_name='MSci-Project', task_name='Gridworld, n=8, b=1, state 34 removed from paths. Run till convergence') #init task on ClearML
+    
+
     #load variables from file
     open_file = open("NNIRL_param_list.pkl", "rb")
     NNIRL_param_list = pickle.load(open_file)
@@ -597,6 +598,9 @@ def run_single_NN():
     configuration_dict = NNIRL_param_list[9]
     truep = NNIRL_param_list[10] 
     NLL_EVD_plots = NNIRL_param_list[11]
+    example_samples = NNIRL_param_list[12]
+    noisey_features = NNIRL_param_list[13]
+
     NLL = NLLFunction()  # initialise NLL
     #assign constants
     NLL.F = F
@@ -621,13 +625,27 @@ def run_single_NN():
     diff = 1000 #init diff
     evd = 10 #init val
 
+    #noisey_features=True
+    if noisey_features:
+        #add noise to features at states 12, 34 and 64 (when mdp_params.n=8)
+        #set each states features to all 0
+        print('\n... adding noise to features at states 12, 34 and 64 ...\n')
+        X[11,:] = torch.zeros(X.size()[1])
+        X[33,:] = torch.zeros(X.size()[1])
+        X[63,:] = torch.zeros(X.size()[1])
+
+    #if noisey_paths:
+       # print('\n... adding noise to paths at states 12, 34 and 64 ...\n')
+
+
     if (optim_type == 'Adam'):
         print('\nOptimising with torch.Adam\n')
         optimizer = torch.optim.Adam(
-            net.parameters(), lr=configuration_dict.get('base_lr', 0.07500000000000001), weight_decay=1e-2) #weight decay for l2 regularisation
+            net.parameters(), lr=configuration_dict.get('base_lr'), weight_decay=1e-2) #weight decay for l2 regularisation
         #while(evd > threshold): #termination criteria: evd threshold
-        #for p in range(configuration_dict.get('number_of_epochs', 3)): #termination criteria: no of iters in config dict
+        #for p in range(configuration_dict.get('number_of_epochs')): #termination criteria: no of iters in config dict
         while diff >= threshold: #termination criteria: loss diff
+        #for p in range(250): #for testing
             prevLoss = loss
             net.zero_grad()
             
@@ -688,5 +706,5 @@ def run_single_NN():
     print("\nruntime: --- %s seconds ---\n" % (time.time() - start_time) )
     return net, finalOutput, (time.time() - start_time)
 
-
-run_single_NN()
+if __name__ == "__main__":
+    run_single_NN()

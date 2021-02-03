@@ -46,9 +46,9 @@ import pickle
 
 tensorboard_writer = SummaryWriter('./tensorboard_logs')
 #print('torch version:', torch.__version__)
-torch.set_printoptions(precision=5, sci_mode=False, threshold=100000)
+torch.set_printoptions(precision=5, sci_mode=False, threshold=1000)
 torch.set_default_tensor_type(torch.DoubleTensor)
-np.set_printoptions(precision=5, threshold=100000, suppress=False)
+np.set_printoptions(precision=5, threshold=1000, suppress=False)
 
 class testers:
 
@@ -496,26 +496,41 @@ class testers:
 
         # insert code to test how accurate BNN is i.e make predictions. last section of code from https://towardsdatascience.com/making-your-neural-network-say-i-dont-know-bayesian-nns-using-pyro-and-pytorch-b1c24e6ab8cd
 
+
+
 if len(sys.argv) > 1:
     worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
     user_input = True
 else:
     user_input = False
 
+
+#set trigger params
+final_figures = True
 NLL_EVD_plots = False 
 heatmapplots = False
-final_figures = True
+new_paths = True
+noisey_features = False
+
+if new_paths:
+    print('\n ... new paths will be sampled and dumped to NNIRL_param_list.pkl this run ...\n')
+else:
+    print('\n ... loading paths and params from NNIRL_param_list.pkl ...\n')
+
+
 N = 100 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
 
+# Generate mdp and R
+# Will always produce constant results due to constant random seed param
 if(user_input):
-    #generate mdp and R
     if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
         mdp_data, r, feature_data, mdp_params = create_gridworld()
     elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
         mdp_data, r, feature_data, true_feature_map, mdp_params = create_objectworld()
 else:
     mdp_data, r, feature_data, mdp_params = create_gridworld()
+
 
 #Solve MDP
 print("\n... performing value iteration for v, q, logp and truep ...")
@@ -524,16 +539,37 @@ mdp_solution = {'v': v, 'q': q, 'p': truep, 'logp': logp}
 optimal_policy = np.argmax(truep.detach().cpu().numpy(), axis=1)
 print("\n... done ...")
 
+if new_paths:
+    #Sample paths
+    print("\n... sampling paths from true R ...")
+    example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
+    print("\n... done sampling", N, "paths ...")
 
-#Sample paths
-print("\n... sampling paths from true R ...")
-example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
-print("\n... done sampling", N, "paths ...")
-
-#initalise loss function
 NLL = NLLFunction()  # initialise NLL
-initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples, feature_data)  # calculate required variables
-initD = initD #scale down
+if new_paths:
+    initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples, feature_data)  # calculate required variables
+else:
+    print("\n... using pre-loaded sampled paths ...")
+    #load variables from file
+    open_file = open("NNIRL_param_list.pkl", "rb")
+    NNIRL_param_list = pickle.load(open_file)
+    open_file.close()
+    threshold = NNIRL_param_list[0]
+    optim_type = NNIRL_param_list[1]
+    net = NNIRL_param_list[2]
+    X = NNIRL_param_list[3]
+    initD = NNIRL_param_list[4]
+    mu_sa = NNIRL_param_list[5]
+    muE = NNIRL_param_list[6]
+    F = NNIRL_param_list[7]
+    #F = F.type(torch.DoubleTensor)
+    mdp_data = NNIRL_param_list[8]
+    configuration_dict = NNIRL_param_list[9]
+    truep = NNIRL_param_list[10] 
+    NLL_EVD_plots = NNIRL_param_list[11]
+    example_samples = NNIRL_param_list[12]
+    noisey_features = NNIRL_param_list[13]
+
 # assign constant class variable
 NLL.F = F
 NLL.muE = muE
@@ -541,27 +577,22 @@ NLL.mu_sa = mu_sa
 NLL.initD = initD
 NLL.mdp_data = mdp_data
 
-#Optim config2: 'base_lr': 0.034999, 'i2': 28, 'h1_out': 10, 'h2_out': 6
-#Optim config1: base_lr=0.07500000000000001 h1_out=16 h2_out=10 i2=28
-configuration_dict = {'number_of_epochs': 100, 'base_lr': 0.07500000000000001, 'i2': 28, 'h1_out': 16, 'h2_out': 10} #set config params for clearml
-mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 28), configuration_dict.get('h1_out', 16), configuration_dict.get('h2_out', 10)) #config net
+configuration_dict = {'number_of_epochs': 250, 'base_lr': 0.065, 'i2': 34, 'h1_out': 14, 'h2_out': 6} #set config params for clearml
+mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2'), configuration_dict.get('h1_out'), configuration_dict.get('h2_out')) #config net
 
-#save params for NNIRL to file
-NNIRL_param_list = [0.001, "Adam", mynet, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots]
-file_name = "NNIRL_param_list.pkl"
-open_file = open(file_name, "wb")
-pickle.dump(NNIRL_param_list, open_file)
-open_file.close()
+print('\n using neural network with parameters: ', configuration_dict)
 
+if new_paths:
+    #save params for NNIRL to file
+    NNIRL_param_list = [0.0001, "Adam", mynet, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots, example_samples, noisey_features]
+    file_name = "NNIRL_param_list.pkl"
+    open_file = open(file_name, "wb")
+    pickle.dump(NNIRL_param_list, open_file)
+    open_file.close()
 
-print('\n... ending termination now params saved to file ...\n')
-
-os._exit(1)
 
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
-
-
+print("\nTrue R has:\n - negated likelihood: {}\n - optimal policy: {}\n".format(trueNLL, optimal_policy))
 
 #run single NN 
 single_net, feature_weights, run_time = run_single_NN()
@@ -621,8 +652,6 @@ if final_figures:
         'mdp_solution': mdp_solution,
         'feature_data': feature_data
     }
-
-
 
     #call respective draw method
     if(user_input):

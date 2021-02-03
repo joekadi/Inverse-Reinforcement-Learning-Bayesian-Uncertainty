@@ -55,7 +55,6 @@ def gridworldbuild(mdp_params):
     feature_data = gridworldfeatures(mdp_params,mdp_data)
     return mdp_data, r, feature_data
 
-
 def gridworldfeatures(mdp_params, mdp_data):
 
     #Construct adjacency table.
@@ -196,11 +195,10 @@ def gridworlddrawagent(x,y,a,colour,f,ax):
         yv = np.append(yv, yv[0])
         ax.fill(xv, yv, colour, linewidth=w)
 
-
 def create_gridworld():
     print("\n... generating gridworld MDP and intial R ...")
     #mdp_params = {'n': 32, 'b': 4, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
-    #mdp_params = {'n': 16, 'b': 4, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
+    #mdp_params = {'n': 16, 'b': 2, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
     mdp_params = {'n': 8, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
     mdp_data, r, feature_data = gridworldbuild(mdp_params)
     print("\n... done ...")
