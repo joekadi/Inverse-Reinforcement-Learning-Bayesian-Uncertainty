@@ -8,7 +8,7 @@ from clearml.automation.optimization import RandomSearch
 from clearml.automation.optuna import OptimizerOptuna
 TEMPLATE_TASK_ID = str(sys.argv[1])
 task = Task.create(project_name='MSci-Project',
-                task_name='NN Hyperparameter Search',
+                task_name='NN Hyperparameter Search w.r.t minimising loss',
                 task_type=Task.TaskTypes.optimizer)
 optimizer = HyperParameterOptimizer(
     base_task_id=TEMPLATE_TASK_ID,  # This is the experiment we want to optimize
@@ -29,8 +29,8 @@ optimizer = HyperParameterOptimizer(
     
     # Configuring optimization parameters
     execution_queue='default',  # queue to schedule the experiments for execution
-    max_number_of_concurrent_tasks=2,  # number of concurrent experiments
-    optimization_time_limit=60.,  # set the time limit for the optimization process
+    max_number_of_concurrent_tasks=4,  # number of concurrent experiments
+    optimization_time_limit=180.,  # set the time limit for the optimization process
     compute_time_limit=120,  # set the compute time limit (sum of execution time on all machines)
     total_max_jobs=40,  # set the maximum number of experiments for the optimization. 
                         # Converted to total number of iteration for OptimizerBOHB
