@@ -7,21 +7,21 @@ from clearml.automation import HyperParameterOptimizer
 from clearml.automation.optimization import RandomSearch
 from clearml.automation.optuna import OptimizerOptuna
 TEMPLATE_TASK_ID = str(sys.argv[1])
-task = Task.init(project_name='MSci-Project',
+task = Task.create(project_name='MSci-Project',
                 task_name='NN Hyperparameter Search',
                 task_type=Task.TaskTypes.optimizer)
 optimizer = HyperParameterOptimizer(
     base_task_id=TEMPLATE_TASK_ID,  # This is the experiment we want to optimize
     # here we define the hyper-parameters to optimize
     hyper_parameters=[
-        UniformIntegerParameterRange('i2', min_value=26, max_value=32, step_size=2),
-        UniformIntegerParameterRange('h1_out', min_value=10, max_value=16, step_size=2),
-        UniformIntegerParameterRange('h2_out', min_value=2, max_value=8, step_size=2),
+        UniformIntegerParameterRange('i2', min_value=26, max_value=34, step_size=2),
+        UniformIntegerParameterRange('h1_out', min_value=12, max_value=20, step_size=2),
+        UniformIntegerParameterRange('h2_out', min_value=2, max_value=10, step_size=2),
         UniformParameterRange('base_lr', min_value=0.005, max_value=0.1, step_size=0.005),
     ],
     # setting the objective metric we want to maximize/minimize
-    objective_metric_title='evd',
-    objective_metric_series='evd',
+    objective_metric_title='loss',
+    objective_metric_series='loss',
     objective_metric_sign='min',  # maximize or minimize the objective metric
 
     # setting optimizer - clearml supports GridSearch, RandomSearch, OptimizerBOHB and OptimizerOptuna
@@ -32,7 +32,7 @@ optimizer = HyperParameterOptimizer(
     max_number_of_concurrent_tasks=2,  # number of concurrent experiments
     optimization_time_limit=60.,  # set the time limit for the optimization process
     compute_time_limit=120,  # set the compute time limit (sum of execution time on all machines)
-    total_max_jobs=30,  # set the maximum number of experiments for the optimization. 
+    total_max_jobs=40,  # set the maximum number of experiments for the optimization. 
                         # Converted to total number of iteration for OptimizerBOHB
     min_iteration_per_job=15000,  # minimum number of iterations per experiment, till early stopping
     max_iteration_per_job=150000,  # maximum number of iterations per experiment
