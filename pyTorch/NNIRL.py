@@ -606,8 +606,7 @@ def run_single_NN():
     NLL.mdp_data = mdp_data
 
     configuration_dict = task.connect(configuration_dict)  #enabling configuration override by clearml
-    print('threshold should be 0.004', threshold)
-    os._exit(1)
+
     start_time = time.time() #to time execution
     #tester = testers() #to use testing functions
 
