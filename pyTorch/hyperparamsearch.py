@@ -30,9 +30,9 @@ optimizer = HyperParameterOptimizer(
     # Configuring optimization parameters
     execution_queue='default',  # queue to schedule the experiments for execution
     max_number_of_concurrent_tasks=4,  # number of concurrent experiments
-    optimization_time_limit=180.,  # set the time limit for the optimization process
+    optimization_time_limit=80.,  # set the time limit for the optimization process
     compute_time_limit=120,  # set the compute time limit (sum of execution time on all machines)
-    total_max_jobs=40,  # set the maximum number of experiments for the optimization. 
+    total_max_jobs=60,  # set the maximum number of experiments for the optimization. 
                         # Converted to total number of iteration for OptimizerBOHB
     min_iteration_per_job=15000,  # minimum number of iterations per experiment, till early stopping
     max_iteration_per_job=150000,  # maximum number of iterations per experiment

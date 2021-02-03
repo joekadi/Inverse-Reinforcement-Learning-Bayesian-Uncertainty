@@ -547,7 +547,7 @@ configuration_dict = {'number_of_epochs': 100, 'base_lr': 0.07500000000000001, '
 mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2', 28), configuration_dict.get('h1_out', 16), configuration_dict.get('h2_out', 10)) #config net
 
 #save params for NNIRL to file
-NNIRL_param_list = ['0.004', "Adam", mynet, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots]
+NNIRL_param_list = ['0.001', "Adam", mynet, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots]
 file_name = "NNIRL_param_list.pkl"
 open_file = open(file_name, "wb")
 pickle.dump(NNIRL_param_list, open_file)
