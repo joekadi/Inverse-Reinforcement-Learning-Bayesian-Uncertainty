@@ -577,7 +577,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
 
 def run_single_NN():
 
-    task = Task.init(project_name='MSci-Project', task_name='Gridworld, n=16, b=2, normal') #init task on ClearML
+    task = Task.init(project_name='MSci-Project', task_name='Gridworld, n=32, b=4, normal') #init task on ClearML
     
 
     #load variables from file

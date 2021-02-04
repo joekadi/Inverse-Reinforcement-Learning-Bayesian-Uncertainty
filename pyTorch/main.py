@@ -577,14 +577,14 @@ NLL.mu_sa = mu_sa
 NLL.initD = initD
 NLL.mdp_data = mdp_data
 
-configuration_dict = {'number_of_epochs': 250, 'base_lr': 0.065, 'i2': 34, 'h1_out': 14, 'h2_out': 6} #set config params for clearml
+configuration_dict = {'number_of_epochs': 200, 'base_lr': 0.1, 'i2': 40, 'h1_out': 20, 'h2_out': 6} #set config params for clearml
 mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2'), configuration_dict.get('h1_out'), configuration_dict.get('h2_out')) #config net
 
 print('\n using neural network with parameters: ', configuration_dict)
 
 if new_paths:
     #save params for NNIRL to file
-    NNIRL_param_list = [0.0001, "Adam", mynet, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots, example_samples, noisey_features]
+    NNIRL_param_list = [0.01, "Adam", mynet, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots, example_samples, noisey_features]
     file_name = "NNIRL_param_list.pkl"
     open_file = open(file_name, "wb")
     pickle.dump(NNIRL_param_list, open_file)
