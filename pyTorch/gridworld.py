@@ -197,9 +197,9 @@ def gridworlddrawagent(x,y,a,colour,f,ax):
 
 def create_gridworld():
     print("\n... generating gridworld MDP and intial R ...")
-    #mdp_params = {'n': 32, 'b': 4, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
+    mdp_params = {'n': 32, 'b': 4, 'determinism': 1.0, 'discount': 0.9, 'seed': 0}
     #mdp_params = {'n': 16, 'b': 2, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
-    mdp_params = {'n': 8, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
+    #mdp_params = {'n': 8, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}
     mdp_data, r, feature_data = gridworldbuild(mdp_params)
     print("\n... done ...")
     return mdp_data, r, feature_data, mdp_params

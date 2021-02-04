@@ -167,7 +167,6 @@ def run_single_NN(threshold, optim_type, net, NLL, X, initD, mu_sa, muE, F, mdp_
     
     print("\nruntime: --- %s seconds ---\n" % (time.time() - start_time) )
     return net, finalOutput, (time.time() - start_time)
-
 '''
 
 def ensemble_selector(loss_function, optim_for_loss, y_hats, X, init_size=1,
@@ -578,7 +577,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
 
 def run_single_NN():
 
-    task = Task.init(project_name='MSci-Project', task_name='Gridworld, n=8, b=1, state 34 removed from paths. Run till convergence') #init task on ClearML
+    task = Task.init(project_name='MSci-Project', task_name='Gridworld, n=16, b=2, normal') #init task on ClearML
     
 
     #load variables from file
@@ -645,7 +644,7 @@ def run_single_NN():
         #while(evd > threshold): #termination criteria: evd threshold
         #for p in range(configuration_dict.get('number_of_epochs')): #termination criteria: no of iters in config dict
         while diff >= threshold: #termination criteria: loss diff
-        #for p in range(250): #for testing
+        #for p in range(1): #for testing
             prevLoss = loss
             net.zero_grad()
             
