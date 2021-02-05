@@ -577,7 +577,7 @@ NLL.mu_sa = mu_sa
 NLL.initD = initD
 NLL.mdp_data = mdp_data
 
-configuration_dict = {'number_of_epochs': 200, 'base_lr': 0.1, 'i2': 40, 'h1_out': 20, 'h2_out': 6} #set config params for clearml
+configuration_dict = {'number_of_epochs': 200, 'base_lr': 0.1, 'i2': 30, 'h1_out': 15, 'h2_out': 6} #set config params for clearml
 mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2'), configuration_dict.get('h1_out'), configuration_dict.get('h2_out')) #config net
 
 print('\n using neural network with parameters: ', configuration_dict)
