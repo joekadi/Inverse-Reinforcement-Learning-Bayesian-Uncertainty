@@ -166,10 +166,10 @@ class NLLFunction(torch.autograd.Function):
 
         #reconsrtuct mdp_data since ctx can't save dicts
         mdp_data = {
-            'states':states.item(), 
-            'actions':actions.item(), 
-            'discount':discount.item(), 
-            'determinism':determinism.item(),
+            'states':states, 
+            'actions':actions, 
+            'discount':discount, 
+            'determinism':determinism,
             'sa_s':sa_s,
             'sa_p':sa_p
             }
@@ -196,7 +196,7 @@ class NLLFunction(torch.autograd.Function):
         
         #Calc gradient w.r.t to forward inputs 
         D = grad_output.clone()
-        D = linearmdpfrequency(mdp_data,p.detach().cpu().numpy(),initD.detach().cpu().numpy())#Compute state visitation count D
+        D = linearmdpfrequency(mdp_data,p,initD)#Compute state visitation count D
         D = D.clone().detach().requires_grad_(True) #cast to tensor
         #D = torch.tensor(D.clone().detach().requires_grad_(True)) #Cast to tensor
         dr = muE - torch.matmul(torch.t(F),D) #Compute gradient

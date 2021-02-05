@@ -128,16 +128,16 @@ def run_single_NN(threshold, optim_type, net, NLL, X, initD, mu_sa, muE, F, mdp_
             optimizer.step()
 
             #printline to show est R
-            #print('{}: output:\n {} | EVD: {} | loss: {} '.format(i, torch.matmul(X, output).repeat(1, 5).detach().numpy(), evd, loss.detach().numpy()))
+            #print('{}: output:\n {} | EVD: {} | loss: {} '.format(i, torch.matmul(X, output).repeat(1, 5)  , evd, loss  ))
 
             #printline to hide est R
-            print('{}: | EVD: {} | loss: {} | diff {}'.format(i, evd, loss.detach().numpy(), diff))
+            print('{}: | EVD: {} | loss: {} | diff {}'.format(i, evd, loss  , diff))
             # store metrics for printing
-            NLList.append(loss.item())
+            NLList.append(loss )
             iterations.append(i)
-            evdList.append(evd.item())
+            evdList.append(evd )
             finaloutput = output
-            tensorboard_writer.add_scalar('loss', loss.detach().numpy(), i)
+            tensorboard_writer.add_scalar('loss', loss  , i)
             tensorboard_writer.add_scalar('evd', evd, i)
             tensorboard_writer.add_scalar('diff', diff, i)
 
@@ -214,7 +214,7 @@ def ensemble_selector(loss_function, optim_for_loss, y_hats, X, init_size=1,
             losses[model] = loss_function.apply(
                 y_hat, initD, mu_sa, muE, F, mdp_data)
         else:
-            losses[model] = loss_function.calculate_EVD(truep, torch.matmul(X, y_hat)).item()
+            losses[model] = loss_function.calculate_EVD(truep, torch.matmul(X, y_hat))
 
     # Get the initial ensemble comprised of the best models
     losses = pd.Series(losses).sort_values()
@@ -233,7 +233,7 @@ def ensemble_selector(loss_function, optim_for_loss, y_hats, X, init_size=1,
             init_loss = loss_function.apply(
                 y_hat, initD, mu_sa, muE, F, mdp_data)
         else:
-            init_loss = loss_function.calculate_EVD(truep, torch.matmul(X, y_hat)).item()
+            init_loss = loss_function.calculate_EVD(truep, torch.matmul(X, y_hat))
 
     # Define the set of available models
     if replacement:
@@ -262,10 +262,10 @@ def ensemble_selector(loss_function, optim_for_loss, y_hats, X, init_size=1,
             tmp_y_avg[mod] = w_current * y_hat_avg + w_new * y_hats[mod]
             if optim_for_loss:
                 tmp_losses[mod] = loss_function.apply(
-                    tmp_y_avg[mod], initD, mu_sa, muE, F, mdp_data).item()
+                    tmp_y_avg[mod], initD, mu_sa, muE, F, mdp_data)
             else:
                 tmp_losses[mod] = loss_function.calculate_EVD(
-                    truep, torch.matmul(X, tmp_y_avg[mod])).item()
+                    truep, torch.matmul(X, tmp_y_avg[mod]))
 
         # Locate the best trial
         best_model = pd.Series(tmp_losses).sort_values().index[0]
@@ -344,7 +344,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
                 evd = NLL.calculate_EVD(truep, torch.matmul(X, yhat))
 
                 print('{} | EVD: {} | loss: {} '.format(
-                    i, evd, loss.detach().numpy()))
+                    i, evd, loss ))
 
                 # Backpropogate and update weights
                 loss.backward()
@@ -352,8 +352,8 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
                 optimizer.step()
 
                 # Append loss and EVD estimates
-                epoch_loss.append(loss.item())
-                epoch_evd.append(evd.item())
+                epoch_loss.append(loss )
+                epoch_evd.append(evd())
 
             # Compute metrics for this epoch
             train_loss.append(np.array(epoch_loss).mean())
@@ -414,7 +414,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
 
         # compute evd & loss
         test_loss = NLL.apply(y_hat_test, initD, mu_sa,
-                              muE, F, mdp_data).item()
+                              muE, F, mdp_data)()
         test_evd = NLL.calculate_EVD(truep, torch.matmul(X, y_hat_test))
 
         # Store the outputs
@@ -507,7 +507,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
         ).sum(axis=0)
 
         ensemble_loss_test.append(
-            NLL.apply(tmp_y_hat, initD, mu_sa, muE, F, mdp_data).item())
+            NLL.apply(tmp_y_hat, initD, mu_sa, muE, F, mdp_data) )
     ensemble_loss_test = pd.Series(ensemble_loss_test)
 
     # Compute loss of an ensemble which equally weights each model in the pool
@@ -515,7 +515,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
     for model, predictedR in y_hats_test.items():
         losses.append(NLL.apply(predictedR, initD, mu_sa, muE, F, mdp_data))
     ens_loss_test_avg = sum(losses) / len(losses)
-    ens_loss_test_avg = ens_loss_test_avg.item()
+    ens_loss_test_avg = ens_loss_test_avg 
 
     # plot
     fig, ax = plt.subplots(1, 1, figsize=(15, 7), sharey=False)
@@ -549,7 +549,7 @@ def run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate,
     for model, predictedR in y_hats_test.items():
         evds.append(NLL.calculate_EVD(truep, torch.matmul(X, predictedR)))
     ens_acc_test_avg = sum(evds) / len(evds)
-    ens_acc_test_avg = ens_acc_test_avg.item()
+    ens_acc_test_avg = ens_acc_test_avg 
 
     # plot
     fig, ax = plt.subplots(1, 1, figsize=(15, 7), sharey=False)
@@ -665,16 +665,16 @@ def run_single_NN():
             optimizer.step()
 
             #printline to show est R
-            #print('{}: output:\n {} | EVD: {} | loss: {} '.format(i, torch.matmul(X, output).repeat(1, 5).detach().numpy(), evd, loss.detach().numpy()))
+            #print('{}: output:\n {} | EVD: {} | loss: {} '.format(i, torch.matmul(X, output).repeat(1, 5).detach() , evd, loss.detach() ))
 
             #printline to hide est R
-            print('{}: | EVD: {} | loss: {} | diff {}'.format(i, evd, loss.detach().numpy(), diff))
+            print('{}: | EVD: {} | loss: {} | diff {}'.format(i, evd, loss  , diff))
             # store metrics for printing
-            NLList.append(loss.item())
+            NLList.append(loss )
             iterations.append(i)
-            evdList.append(evd.item())
+            evdList.append(evd )
             finaloutput = output
-            tensorboard_writer.add_scalar('loss', loss.detach().numpy(), i)
+            tensorboard_writer.add_scalar('loss', loss  , i)
             tensorboard_writer.add_scalar('evd', evd, i)
             tensorboard_writer.add_scalar('diff', diff, i)
 

@@ -23,7 +23,7 @@ def linearmdpfrequency(mdp_data,p,initD):
         D_mx = torch.tensor(D_CSR.todense()) @ torch.ones(states*actions*transitions,1)
         D_s = torch.sum(D_mx,1)
         D_s = D_s.view(len(D_s), 1)
-        D = torch.from_numpy(initD) + D_s
+        D = initD + D_s
         #D *= 1/D.max() #normalize between 0 and 1
 
         diff = torch.max(torch.abs(torch.subtract(D,Dp)))

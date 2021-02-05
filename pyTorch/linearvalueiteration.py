@@ -7,10 +7,18 @@ def maxentsoftmax(q):
 
     maxx = q.max(1)[0]
     maxx = maxx.view(len(maxx),1) #make column vector
-    inside = torch.sum(torch.exp(q - torch.tensor(np.tile(maxx.detach().numpy(), (1, q.shape[1])))),1)
+
+    #line using tile -- working!
+    #inside = torch.sum(torch.exp(q - torch.tile(maxx, (1, q.shape[1]))),1)
+
+    #experimental line using torch.repeat
+    
+    inside = torch.sum(torch.exp(q - maxx.repeat(1, q.shape[1])   ),1)
+
     inside = torch.reshape(inside, (len(inside), 1))
     v = maxx + torch.log(inside)
     return v
+
 
 def linearvalueiteration(mdp_data, r):
 
@@ -41,7 +49,14 @@ def linearvalueiteration(mdp_data, r):
     #compute policy
     #print('q\n', q)
     #logp = q - v.repeat([1,int(mdp_data['actions'])])
-    logp = q - torch.tensor(np.tile(v.detach().numpy(), (1, int(mdp_data['actions']))))
+
+    #line using tile -- working!
+    #logp = q - torch.tensor(torch.tile(v, (1, int(mdp_data['actions']))))
+
+    #experimental line using torch.repeat
+    logp = q - v.repeat(1,int(mdp_data['actions']) )   
+
+
     p = torch.exp(logp)
 
     return v, q, logp, p

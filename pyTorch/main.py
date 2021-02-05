@@ -45,7 +45,7 @@ from torch.utils.tensorboard import SummaryWriter
 import pickle
 
 tensorboard_writer = SummaryWriter('./tensorboard_logs')
-#print('torch version:', torch.__version__)
+print('\n\ntorch version:', torch.__version__)
 torch.set_printoptions(precision=5, sci_mode=False, threshold=1000)
 torch.set_default_tensor_type(torch.DoubleTensor)
 np.set_printoptions(precision=5, threshold=1000, suppress=False)
@@ -536,7 +536,7 @@ else:
 print("\n... performing value iteration for v, q, logp and truep ...")
 v, q, logp, truep = linearvalueiteration(mdp_data, r)
 mdp_solution = {'v': v, 'q': q, 'p': truep, 'logp': logp}
-optimal_policy = np.argmax(truep.detach().cpu().numpy(), axis=1)
+optimal_policy = torch.argmax(truep, axis=1)
 print("\n... done ...")
 
 if new_paths:
@@ -605,9 +605,9 @@ if(feature_weights.shape != (mdp_data['states'],5)):
 
 predictedv, predictedq, predictedlogp, predictedP = linearvalueiteration(mdp_data, predictedR)
 predicted_mdp_solution = {'v': predictedv, 'q': predictedq, 'p': predictedP, 'logp': predictedlogp}
-predicted_optimal_policy = np.argmax(predictedP.detach().cpu().numpy(), axis=1)
-print("Predicted R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(predictedR.detach().cpu().numpy(), NLL.apply(predictedR, initD, mu_sa, muE, F, mdp_data), predicted_optimal_policy))  # Printline if LH is scalar
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r.detach().cpu().numpy(), trueNLL, optimal_policy))  # Printline if LH is scalar
+predicted_optimal_policy = torch.argmax(predictedP, axis=1)
+print("Predicted R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(predictedR, NLL.apply(predictedR, initD, mu_sa, muE, F, mdp_data), predicted_optimal_policy))  # Printline if LH is scalar
+print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r, trueNLL, optimal_policy))  # Printline if LH is scalar
 
 if heatmapplots:
     #plot heatmaps of rewards
