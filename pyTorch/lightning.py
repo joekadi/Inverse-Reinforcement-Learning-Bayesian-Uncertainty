@@ -149,7 +149,7 @@ if __name__ == "__main__":
         predictedR = predictedR.repeat((1, 5))
 
     predictedv, predictedq, predictedlogp, predictedP = linearvalueiteration(mdp_data, predictedR)
-    print("\nPredicted R has:\n - negated likelihood: {}\n - EVD: {}".format(NLL.apply(predictedR, initD, mu_sa, muE, F, mdp_data), NLL.calculate_EVD(truep, predictedR )))
+    print("\nPredicted R has:\n - negated likelihood: {}\n - EVD: {}".format(NLL.apply(predictedR, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, predictedR )))
 
     irl_result = { #models IRL results
         'r': predictedR,
