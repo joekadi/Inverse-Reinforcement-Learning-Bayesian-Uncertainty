@@ -57,6 +57,7 @@ class LitModel(pl.LightningModule):
         x  = Functional.relu(self.layer_1(x))
         x = Functional.relu(self.layer_2(x))
         x = Functional.relu(self.layer_3(x))
+
         x = self.layer_4(x)
 
         return x
@@ -144,9 +145,9 @@ if __name__ == "__main__":
     run_time = (time.time() - start_time)
 
     #make predictions with learned model
-    pred_feature_weights = torch.empty(len(feature_data['splittable']), 1)
+    pred_feature_weights = torch.empty(len(feature_data['splittable'][0]), 1)
     for i in range(len(feature_data['splittable'])):
-        pred_feature_weights[i] = model(feature_data['splittable'][i].view(-1))
+        pred_feature_weights = model(feature_data['splittable'][i].view(-1))
 
     #convert to full reward
     if(pred_feature_weights.shape != (mdp_data['states'],5)):
