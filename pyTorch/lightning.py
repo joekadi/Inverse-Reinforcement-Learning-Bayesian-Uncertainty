@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
       
     task = Task.init(project_name='MSci-Project', task_name='LitModel Run, n=8, b=1, normal') #init task on ClearML
-    configuration_dict = {'number_of_epochs': 1, 'base_lr': 0.1, 'i2': 30, 'h1_out': 15, 'h2_out': 6} #set config params for clearml
+    configuration_dict = {'number_of_epochs': 1, 'base_lr': 0.1, 'i2': 32, 'h1_out': 32, 'h2_out': 32} #set config params for clearml
     configuration_dict = task.connect(configuration_dict)
     
     #load variables from file

@@ -15,9 +15,9 @@ optimizer = HyperParameterOptimizer(
     # here we define the hyper-parameters to optimize
     hyper_parameters=[
         UniformIntegerParameterRange('number_of_epochs', min_value=1, max_value=4, step_size=1),
-        UniformIntegerParameterRange('i2', min_value=30, max_value=42, step_size=2),
-        UniformIntegerParameterRange('h1_out', min_value=15, max_value=21, step_size=2),
-        UniformIntegerParameterRange('h2_out', min_value=6, max_value=10, step_size=2),
+        UniformIntegerParameterRange('i2', min_value=16, max_value=30, step_size=1),
+        UniformIntegerParameterRange('h1_out', min_value=16, max_value=30, step_size=1),
+        UniformIntegerParameterRange('h2_out', min_value=16, max_value=30, step_size=1),
         UniformParameterRange('base_lr', min_value=0.005, max_value=0.1, step_size=0.05),
     ],
     # setting the objective metric we want to maximize/minimize
@@ -31,9 +31,9 @@ optimizer = HyperParameterOptimizer(
     # Configuring optimization parameters
     execution_queue='default',  # queue to schedule the experiments for execution
     max_number_of_concurrent_tasks=4,  # number of concurrent experiments
-    optimization_time_limit=80.,  # set the time limit for the optimization process
-    compute_time_limit=80,  # set the compute time limit (sum of execution time on all machines)
-    total_max_jobs=80,  # set the maximum number of experiments for the optimization. 
+    optimization_time_limit=60.,  # set the time limit for the optimization process
+    compute_time_limit=60,  # set the compute time limit (sum of execution time on all machines)
+    total_max_jobs=100,  # set the maximum number of experiments for the optimization. 
                         # Converted to total number of iteration for OptimizerBOHB
     min_iteration_per_job=15000,  # minimum number of iterations per experiment, till early stopping
     max_iteration_per_job=150000,  # maximum number of iterations per experiment
