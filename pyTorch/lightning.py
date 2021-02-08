@@ -49,15 +49,18 @@ class LitModel(pl.LightningModule):
     def __init__(self, no_features, configuration_dict):
         super().__init__()
         self.layer_1 = nn.Linear(no_features, configuration_dict['i2'])
+        self.dropout1 = nn.Dropout(p=0.02)
         self.layer_2 = nn.Linear(configuration_dict['i2'], configuration_dict['h1_out'])
         self.layer_3 = nn.Linear(configuration_dict['h1_out'], configuration_dict['h2_out'])
         self.layer_4 = nn.Linear(configuration_dict['h2_out'], no_features)
 
     def forward(self, x):
         x  = Functional.relu(self.layer_1(x))
+        x = self.dropout1(x)
         x = Functional.relu(self.layer_2(x))
+        x = self.dropout1(x)
         x = Functional.relu(self.layer_3(x))
-
+        x = self.dropout1(x)
         x = self.layer_4(x)
 
         return x
@@ -91,7 +94,7 @@ if __name__ == "__main__":
 
       
     task = Task.init(project_name='MSci-Project', task_name='LitModel Run, n=8, b=1, normal') #init task on ClearML
-    configuration_dict = {'number_of_epochs': 1, 'base_lr': 0.1, 'i2': 32, 'h1_out': 32, 'h2_out': 32} #set config params for clearml
+    configuration_dict = {'number_of_epochs': 1, 'base_lr': 0.05, 'i2': 32, 'h1_out': 32, 'h2_out': 32} #set config params for clearml
     configuration_dict = task.connect(configuration_dict)
     
     #load variables from file
@@ -143,35 +146,70 @@ if __name__ == "__main__":
     start_time = time.time()
     trainer.fit(model, train_loader)
     run_time = (time.time() - start_time)
+    PATH = './NN_IRL.pth'
+    torch.save(model.state_dict(), PATH)
+    tensorboard_writer.close()
 
     #make predictions with learned model
-    pred_feature_weights = torch.empty(len(feature_data['splittable'][0]), 1)
+    T = 100
+    pred_reward = torch.empty(len(feature_data['splittable'][0]), 1)
     for i in range(len(feature_data['splittable'])):
-        pred_feature_weights = model(feature_data['splittable'][i].view(-1))
+        #get predictions
+        pred_reward = torch.matmul(feature_data['splittable'], model(feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1))
+        #generate array of T predicitons using the dropout model
+        Yt_hat = np.array([torch.matmul(feature_data['splittable'],model(feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1)).data.cpu().numpy() for _ in range(T)]).squeeze()
 
-    print('pred feature weights shape pre reshape', pred_feature_weights.shape)
-    pred_feature_weights = torch.reshape(pred_feature_weights, (len(pred_feature_weights), 1))
-    print('pred feature weights shape post reshape', pred_feature_weights.shape)
+    y_mc = Yt_hat.mean(axis=0)
+    y_mc_std = Yt_hat.std(axis=0)
 
-    #convert to full reward
-    if(pred_feature_weights.shape != (mdp_data['states'],5)):
-        predictedR = torch.matmul(feature_data['splittable'], pred_feature_weights)
+    print('y_mc_std', y_mc_std)
+
+    #convert y_mc to full reward
+    if(y_mc.size != (mdp_data['states'],5)):
+        y_mc_reward = torch.from_numpy(y_mc)
+        y_mc_reward = y_mc_reward.reshape(len(y_mc_reward), 1)
+        y_mc_reward = y_mc_reward.repeat((1, 5))
+
+    #convert pred_features to full reward
+    if(pred_reward.shape != (mdp_data['states'],5)):
+        predictedR = pred_reward.reshape(len(pred_reward), 1)
         predictedR = predictedR.repeat((1, 5))
 
     predictedv, predictedq, predictedlogp, predictedP = linearvalueiteration(mdp_data, predictedR)
     print("\nPredicted R has:\n - negated likelihood: {}\n - EVD: {}".format(NLL.apply(predictedR, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, predictedR )))
+    print("\n y_mc_reward R has:\n - negated likelihood: {}\n - EVD: {}".format(NLL.apply(y_mc_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, y_mc_reward )))
 
-    irl_result = { #models IRL results
+    #plot regression line with uncertainty shading
+    f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+    ax1.plot(np.arange(1,len(feature_data['splittable'])+1,1), y_mc, alpha=0.8)
+    ax1.fill_between(np.arange(1,len(feature_data['splittable'])+1,1), y_mc-2*y_mc_std, y_mc+2*y_mc_std, alpha=0.3)
+    ax1.set_title('mean from ensemble')
+    ax1.set_xlabel('state')
+    ax1.set_ylabel('reward')
+    ax2.plot(np.arange(1,len(feature_data['splittable'])+1,1), pred_reward.detach().numpy().squeeze(), alpha=0.8)
+    ax2.fill_between(np.arange(1,len(feature_data['splittable'])+1,1), pred_reward.detach().numpy().squeeze()-2*y_mc_std, pred_reward.detach().numpy().squeeze()+2*y_mc_std, alpha=0.3)
+    ax2.set_title('predicited')
+    ax2.set_xlabel('state')
+    plt.show()
+
+    #convert y_mc_std to correct size
+    if(y_mc_std.size != (mdp_data['states'],5)):
+        y_mc_std_resized = torch.from_numpy(y_mc_std)
+        y_mc_std_resized = y_mc_std_resized.reshape(len(y_mc_std_resized), 1)
+        y_mc_std_resized = y_mc_std_resized.repeat((1, 5))
+
+    irl_result = { #predicted results
         'r': predictedR,
         'v': predictedv,
         'p': predictedP,
         'q': predictedq,
         'r_itr': [predictedR],
-        'model_itr': [pred_feature_weights],
+        #'model_itr': [pred_feature_weights], #commented since pred_feature_weights replaced by pred_reward due to matmul in the eval loop
         'model_r_itr': [predictedR],
         'p_itr': [predictedP],
         'model_p_itr':[predictedP],
-        'time': run_time
+        'time': run_time,
+        'uncertainty': y_mc_std_resized
     }
 
     test_result = { #ground truth metrics
@@ -184,6 +222,7 @@ if __name__ == "__main__":
         'feature_data': feature_data
     }
 
+
     #call respective draw method
     if(user_input):
         if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
@@ -192,12 +231,8 @@ if __name__ == "__main__":
             owvisualise(test_result)
     else:
         gwVisualise(test_result)
+    
 
 
-    PATH = './NN_IRL.pth'
-    torch.save(net.state_dict(), PATH)
-    tensorboard_writer.close()
-
-    #return model, model.learned_feature_weights, (time.time() - start_time)
 
 

@@ -98,15 +98,21 @@ def gwVisualise(test_result):
     g = torch.ones(test_result['mdp_data']['states'],1)*0.5+Eo*0.5
 
     #Create figure.
-    f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+    f, (ax1, ax2, ax3) = plt.subplots(1, 3, sharex=True)
         
     #Draw reward for ground truth.
     gridworlddraw(test_result['true_r'],test_result['mdp_solution']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax1)
 
     # Draw reward for IRL result.
     gridworlddraw(test_result['irl_result']['r'],test_result['irl_result']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax2)
-    ax1.set_title('Ground Truth Reward & Policy')
-    ax2.set_title('Estimated Reward & Policy')
+
+    # Draw uncertainty for IRL result
+    gridworlddraw(test_result['irl_result']['uncertainty'],test_result['irl_result']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax3)
+
+    ax1.set_title("Ground Truth Reward & Policy")
+    ax2.set_title("Predicted Reward & Policy")
+    ax3.set_title("Prediction Uncertainty & Policy")
+
     plt.show()
 
 def gridworlddraw(r,p,g,mdp_params, mdp_data, f, ax):
