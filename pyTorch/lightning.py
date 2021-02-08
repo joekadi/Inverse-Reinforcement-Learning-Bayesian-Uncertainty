@@ -69,13 +69,12 @@ class LitModel(pl.LightningModule):
         X = batch
 
         #output = torch.empty(X.shape[1], 1, dtype=torch.double)
-
         output = self(X[0,:].view(-1)) 
         output = output.reshape(len(output), 1)
 
         loss = self.NLL.apply(output, self.initD, self.mu_sa, self.muE, self.F, self.mdp_data)
         evd = self.NLL.calculate_EVD(self.truep, torch.matmul(self.F, output))
-        self.learned_feature_weights = output #store current
+        #self.learned_feature_weights = output #store current
         self.log('train_loss', loss)
         self.log('train_evd', evd)
         return loss
@@ -125,8 +124,9 @@ if __name__ == "__main__":
     train_loader = torch.utils.data.DataLoader(feature_data['splittable'], num_workers = 8)
     trainer = pl.Trainer(max_epochs=configuration_dict['number_of_epochs'])
 
-    model = LitModel(len(feature_data['splittable'][0]), configuration_dict)
+    model = LitModel(len(feature_data['splittable'][0]), configuration_dict) #init model
 
+    #assign constants
     model.NLL = NLL
     model.F = feature_data['splittable']
     model.muE = muE
@@ -135,17 +135,22 @@ if __name__ == "__main__":
     model.mdp_data = mdp_data
     model.truep = truep
     model.configuration_dict = configuration_dict
+    
     print("\nTrue R has:\n - negated likelihood: {}\n - EVD: {}".format(trueNLL,  NLL.calculate_EVD(truep, r)))
 
-
+    #train model
     start_time = time.time()
     trainer.fit(model, train_loader)
     run_time = (time.time() - start_time)
 
-    #calculate, format and print results
-    if(model.learned_feature_weights.shape != (mdp_data['states'],5)):
-        #convert to full reward
-        predictedR = torch.matmul(feature_data['splittable'], model.learned_feature_weights)
+    #make predictions with learned model
+    pred_feature_weights = torch.zeros_like(feature_data['splittable'])
+    for i in range(len(feature_data['splittable'])):
+        pred_feature_weights[i] = model(feature_data['splittable'][i].view(-1))
+
+    #convert to full reward
+    if(pred_feature_weights.shape != (mdp_data['states'],5)):
+        predictedR = torch.matmul(feature_data['splittable'], pred_feature_weights)
         predictedR = predictedR.repeat((1, 5))
 
     predictedv, predictedq, predictedlogp, predictedP = linearvalueiteration(mdp_data, predictedR)
@@ -157,7 +162,7 @@ if __name__ == "__main__":
         'p': predictedP,
         'q': predictedq,
         'r_itr': [predictedR],
-        'model_itr': [model.learned_feature_weights],
+        'model_itr': [pred_feature_weights],
         'model_r_itr': [predictedR],
         'p_itr': [predictedP],
         'model_p_itr':[predictedP],
