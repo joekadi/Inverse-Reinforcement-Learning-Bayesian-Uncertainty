@@ -12,6 +12,7 @@ This is part of my Computing Science Level 5 MSci Project @ Glasgow University w
 - ClearML config
 
 ## ToDo
+- Calbirate uncertainty via Stochastic Weight Averaging Gaussian
 - Visualise Objectworld results
 - Extensive hyperparam search for 64, 256 & 1024 state worlds
 - Introduce noise to experimentally validate uncertainty calibrations
