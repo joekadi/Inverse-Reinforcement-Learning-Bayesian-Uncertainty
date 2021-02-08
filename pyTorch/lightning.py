@@ -78,6 +78,9 @@ class LitModel(pl.LightningModule):
         self.learned_feature_weights = output #store current
         self.log('train_loss', loss)
         self.log('train_evd', evd)
+        tensorboard_writer.add_scalar('loss', loss)
+        tensorboard_writer.add_scalar('evd', evd)
+        
        
         return loss
 
