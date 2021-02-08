@@ -144,7 +144,7 @@ if __name__ == "__main__":
     run_time = (time.time() - start_time)
 
     #make predictions with learned model
-    pred_feature_weights = torch.zeros_like(feature_data['splittable'])
+    pred_feature_weights = torch.empty(len(feature_data['splittable']), 1)
     for i in range(len(feature_data['splittable'])):
         pred_feature_weights[i] = model(feature_data['splittable'][i].view(-1))
 
