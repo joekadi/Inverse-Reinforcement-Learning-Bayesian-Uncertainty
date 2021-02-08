@@ -51,8 +51,7 @@ class NLLFunction(torch.autograd.Function):
                             [0,0,0,1]], dtype=torch.float64)
         '''
         
-        
-
+    
 
         F = feature_data['splittable']
   
@@ -135,6 +134,7 @@ class NLLFunction(torch.autograd.Function):
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r) #cast to tensor
         if(r.shape != (mdp_data['states'],5)):
+
             #convert to full reward
             r = torch.matmul(F, r)
             r = r.repeat((1, 5))

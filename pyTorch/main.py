@@ -30,6 +30,7 @@ from linearvalueiteration import *
 from NNIRL import *
 import pprint
 from sampleexamples import *
+from lightning import *
 import numpy as np
 import pandas as pd
 import time
@@ -497,13 +498,11 @@ class testers:
         # insert code to test how accurate BNN is i.e make predictions. last section of code from https://towardsdatascience.com/making-your-neural-network-say-i-dont-know-bayesian-nns-using-pyro-and-pytorch-b1c24e6ab8cd
 
 
-
 if len(sys.argv) > 1:
     worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
     user_input = True
 else:
     user_input = False
-
 
 #set trigger params
 final_figures = True
@@ -518,7 +517,7 @@ else:
     print('\n ... loading paths and params from NNIRL_param_list.pkl ...\n')
 
 
-N = 100 #number of sampled trajectories
+N = 16 #number of sampled trajectories
 T = 8 #number of actions in each trajectory
 
 # Generate mdp and R
@@ -531,7 +530,6 @@ if(user_input):
 else:
     mdp_data, r, feature_data, mdp_params = create_gridworld()
 
-
 #Solve MDP
 print("\n... performing value iteration for v, q, logp and truep ...")
 v, q, logp, truep = linearvalueiteration(mdp_data, r)
@@ -539,8 +537,8 @@ mdp_solution = {'v': v, 'q': q, 'p': truep, 'logp': logp}
 optimal_policy = torch.argmax(truep, axis=1)
 print("\n... done ...")
 
+#Sample paths
 if new_paths:
-    #Sample paths
     print("\n... sampling paths from true R ...")
     example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
     print("\n... done sampling", N, "paths ...")
@@ -577,95 +575,24 @@ NLL.mu_sa = mu_sa
 NLL.initD = initD
 NLL.mdp_data = mdp_data
 
+
 configuration_dict = {'number_of_epochs': 200, 'base_lr': 0.1, 'i2': 30, 'h1_out': 15, 'h2_out': 6} #set config params for clearml
 mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2'), configuration_dict.get('h1_out'), configuration_dict.get('h2_out')) #config net
+#print('\n using neural network with parameters: ', configuration_dict)
 
-print('\n using neural network with parameters: ', configuration_dict)
+trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
+
+#run single NN 
+#single_net, feature_weights, run_time = run_single_NN()
+
 
 if new_paths:
     #save params for NNIRL to file
-    NNIRL_param_list = [0.01, "Adam", mynet, feature_data['splittable'], initD, mu_sa, muE, F, mdp_data, configuration_dict, truep, NLL_EVD_plots, example_samples, noisey_features]
+    NNIRL_param_list = [0.01, "Adam", mynet, initD, mu_sa, muE, mdp_data, configuration_dict, truep, NLL_EVD_plots, example_samples, noisey_features, mdp_params, r, mdp_solution, feature_data, trueNLL]
     file_name = "NNIRL_param_list.pkl"
     open_file = open(file_name, "wb")
     pickle.dump(NNIRL_param_list, open_file)
     open_file.close()
-
-
-trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
-print("\nTrue R has:\n - negated likelihood: {}\n - optimal policy: {}\n".format(trueNLL, optimal_policy))
-
-#run single NN 
-single_net, feature_weights, run_time = run_single_NN()
-
-#calculate, format and print results
-if(feature_weights.shape != (mdp_data['states'],5)):
-    #convert to full reward
-    predictedR = torch.matmul(feature_data['splittable'], feature_weights)
-    predictedR = predictedR.repeat((1, 5))
-
-predictedv, predictedq, predictedlogp, predictedP = linearvalueiteration(mdp_data, predictedR)
-predicted_mdp_solution = {'v': predictedv, 'q': predictedq, 'p': predictedP, 'logp': predictedlogp}
-predicted_optimal_policy = torch.argmax(predictedP, axis=1)
-print("Predicted R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(predictedR, NLL.apply(predictedR, initD, mu_sa, muE, F, mdp_data), predicted_optimal_policy))  # Printline if LH is scalar
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r, trueNLL, optimal_policy))  # Printline if LH is scalar
-
-if heatmapplots:
-    #plot heatmaps of rewards
-    scaler = MinMaxScaler() # define min max scaler
-    scaledR = scaler.fit_transform(r) # transform data
-    scaler = MinMaxScaler() # define min max scaler
-    scaledpredictedR = scaler.fit_transform(predictedR.detach().cpu().numpy()) # transform data
-    columnR = scaledR[:,0] #turn into column vector
-    gridR =  np.reshape(columnR, (int(math.sqrt(len(columnR))), int(math.sqrt(len(columnR))))) #reshape to grid
-    gridR = gridR * 100
-    columnpredictedR = scaledpredictedR[:,0] #turn into column vector
-    gridpredictedR = np.reshape(columnpredictedR, (int(math.sqrt(len(columnpredictedR))), int(math.sqrt(len(columnpredictedR))))) #reshape to grid
-    #plot as heatmaps
-    ax = sns.heatmap(gridR)
-    plt.show()
-    ax = sns.heatmap(gridpredictedR)
-    plt.show()
-
-#plot final figures
-if final_figures:
-    irl_result = { #models IRL results
-        'r': predictedR,
-        'v': predictedv,
-        'p': predictedP,
-        'q': predictedq,
-        'r_itr': [predictedR],
-        'model_itr': [feature_weights],
-        'model_r_itr': [predictedR],
-        'p_itr': [predictedP],
-        'model_p_itr':[predictedP],
-        'time': run_time
-        
-    }
-
-    
-    test_result = { #ground truth metrics
-        'irl_result': irl_result,
-        'true_r': r,
-        'example_samples': [example_samples],
-        'mdp_data': mdp_data,
-        'mdp_params': mdp_params,
-        'mdp_solution': mdp_solution,
-        'feature_data': feature_data
-    }
-
-    #call respective draw method
-    if(user_input):
-        if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
-            gwVisualise(test_result)
-        elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
-            owvisualise(test_result)
-    else:
-        gwVisualise(test_result)
-
-
-
-
-
 
 
 '''

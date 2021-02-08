@@ -646,9 +646,11 @@ def run_single_NN():
         while diff >= threshold: #termination criteria: loss diff
         #for p in range(1): #for testing
             prevLoss = loss
-            net.zero_grad()
             
+            #net.zero_grad()
+            net.zero_grad(set_to_none=True)
             output = torch.empty(len(X[0]), 1, dtype=torch.double)
+
             indexer = 0
             for j in range(len(X[0])):
                 thisR = net(X[:, j].view(-1, len(X[:, j])))

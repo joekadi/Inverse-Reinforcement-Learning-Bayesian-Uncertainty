@@ -8,12 +8,13 @@ from clearml.automation.optimization import RandomSearch
 from clearml.automation.optuna import OptimizerOptuna
 TEMPLATE_TASK_ID = str(sys.argv[1])
 task = Task.init(project_name='MSci-Project',
-                task_name='NN Hyperparameter Search w.r.t minimising loss',
+                task_name='Hyperparameter Search',
                 task_type=Task.TaskTypes.optimizer)
 optimizer = HyperParameterOptimizer(
     base_task_id=TEMPLATE_TASK_ID,  # This is the experiment we want to optimize
     # here we define the hyper-parameters to optimize
     hyper_parameters=[
+        UniformIntegerParameterRange('number_of_epochs', min_value=1, max_value=4, step_size=1),
         UniformIntegerParameterRange('i2', min_value=30, max_value=42, step_size=2),
         UniformIntegerParameterRange('h1_out', min_value=15, max_value=21, step_size=2),
         UniformIntegerParameterRange('h2_out', min_value=6, max_value=10, step_size=2),
