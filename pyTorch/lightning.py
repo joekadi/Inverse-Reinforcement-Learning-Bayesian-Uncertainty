@@ -78,10 +78,6 @@ class LitModel(pl.LightningModule):
         self.learned_feature_weights = output #store current
         self.log('train_loss', loss)
         self.log('train_evd', evd)
-        tensorboard_writer.add_scalar('loss', loss)
-        tensorboard_writer.add_scalar('evd', evd)
-        
-       
         return loss
 
 
@@ -109,16 +105,15 @@ if __name__ == "__main__":
     mu_sa = NNIRL_param_list[4]
     muE = NNIRL_param_list[5]
     mdp_data = NNIRL_param_list[6]
-    configuration_dict = NNIRL_param_list[7]
-    truep = NNIRL_param_list[8] 
-    NLL_EVD_plots = NNIRL_param_list[9]
-    example_samples = NNIRL_param_list[10]
-    noisey_features = NNIRL_param_list[11] 
-    mdp_params = NNIRL_param_list[12] 
-    r = NNIRL_param_list[13] 
-    mdp_solution = NNIRL_param_list[14] 
-    feature_data = NNIRL_param_list[15] 
-    trueNLL = NNIRL_param_list[16]
+    truep = NNIRL_param_list[7] 
+    NLL_EVD_plots = NNIRL_param_list[8]
+    example_samples = NNIRL_param_list[9]
+    noisey_features = NNIRL_param_list[10] 
+    mdp_params = NNIRL_param_list[11] 
+    r = NNIRL_param_list[12] 
+    mdp_solution = NNIRL_param_list[13] 
+    feature_data = NNIRL_param_list[14] 
+    trueNLL = NNIRL_param_list[15]
     NLL = NLLFunction()  # initialise NLL
     #assign constants
     NLL.F = feature_data['splittable']

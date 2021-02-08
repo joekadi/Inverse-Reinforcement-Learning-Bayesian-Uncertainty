@@ -588,7 +588,7 @@ trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 
 if new_paths:
     #save params for NNIRL to file
-    NNIRL_param_list = [0.01, "Adam", mynet, initD, mu_sa, muE, mdp_data, configuration_dict, truep, NLL_EVD_plots, example_samples, noisey_features, mdp_params, r, mdp_solution, feature_data, trueNLL]
+    NNIRL_param_list = [0.01, "Adam", mynet, initD, mu_sa, muE, mdp_data, truep, NLL_EVD_plots, example_samples, noisey_features, mdp_params, r, mdp_solution, feature_data, trueNLL]
     file_name = "NNIRL_param_list.pkl"
     open_file = open(file_name, "wb")
     pickle.dump(NNIRL_param_list, open_file)
