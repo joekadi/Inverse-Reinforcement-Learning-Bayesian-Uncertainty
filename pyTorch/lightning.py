@@ -149,6 +149,10 @@ if __name__ == "__main__":
     for i in range(len(feature_data['splittable'])):
         pred_feature_weights = model(feature_data['splittable'][i].view(-1))
 
+    print('pred feature weights shape pre reshape', pred_feature_weights.shape)
+    pred_feature_weights = torch.reshape(pred_feature_weights, (len(pred_feature_weights), 1))
+    print('pred feature weights shape post reshape', pred_feature_weights.shape)
+
     #convert to full reward
     if(pred_feature_weights.shape != (mdp_data['states'],5)):
         predictedR = torch.matmul(feature_data['splittable'], pred_feature_weights)
