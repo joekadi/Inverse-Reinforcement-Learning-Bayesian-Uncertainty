@@ -8,10 +8,10 @@ This is part of my Computing Science Level 5 MSci Project @ Glasgow University w
 - Non-Linear IRL w/ Ensemble Neural Network
 - Gridworld benchmark
 - Objectworld benchmark
+- Calibrate NN uncertainty estimates through ensemble methods
+- ClearML config
 
 ## ToDo
 - Visualise Objectworld results
-- Calibrate NN uncertainty estimates x3 methods
-- Build experimental methods to evaluate quality of uncertainty estimates
-- Build all visualisations
-- Evaluate
+- Extensive hyperparam search for 64, 256 & 1024 state worlds
+- Introduce noise to experimentally validate uncertainty calibrations
