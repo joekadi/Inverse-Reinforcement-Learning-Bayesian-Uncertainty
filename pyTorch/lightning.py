@@ -9,6 +9,7 @@ from torch.autograd import Variable
 import torch
 from torch.utils.data import random_split
 import os
+from sklearn.preprocessing import MinMaxScaler
 import sys
 from NLLFunction import *
 from gridworld import *
@@ -45,25 +46,26 @@ class LitModel(pl.LightningModule):
     learned_feature_weights = None
     configuration_dict = None
 
-
-    def __init__(self, no_features, configuration_dict):
+    def __init__(self, no_features, activation, configuration_dict):
         super().__init__()
-        self.layer_1 = nn.Linear(no_features, configuration_dict['i2'])
-        self.dropout1 = nn.Dropout(p=0.02)
-        self.layer_2 = nn.Linear(configuration_dict['i2'], configuration_dict['h1_out'])
-        self.layer_3 = nn.Linear(configuration_dict['h1_out'], configuration_dict['h2_out'])
-        self.layer_4 = nn.Linear(configuration_dict['h2_out'], no_features)
+        self.model = nn.Sequential()
+        self.model.add_module('input', nn.Linear(no_features, configuration_dict['no_neurons_in_hidden_layers']))
+        if activation == 'relu':
+            self.model.add_module('relu0', nn.ReLU())
+        elif activation == 'tanh':
+            self.model.add_module('tanh0', nn.Tanh())
+        for i in range(configuration_dict['no_hidden_layers']):
+            self.model.add_module('dropout'+str(i+1), nn.Dropout(p=configuration_dict['p']))
+            self.model.add_module('hidden'+str(i+1), nn.Linear(configuration_dict['no_neurons_in_hidden_layers'], configuration_dict['no_neurons_in_hidden_layers']))
+            if activation == 'relu':
+                self.model.add_module('relu'+str(i+1), nn.ReLU())
+            elif activation == 'tanh':
+                self.model.add_module('tanh'+str(i+1), nn.Tanh())
+        self.model.add_module('dropout'+str(i+2), nn.Dropout(p=configuration_dict['p']))
+        self.model.add_module('final', nn.Linear(configuration_dict['no_neurons_in_hidden_layers'], no_features))
 
     def forward(self, x):
-        x  = Functional.relu(self.layer_1(x))
-        x = self.dropout1(x)
-        x = Functional.relu(self.layer_2(x))
-        x = self.dropout1(x)
-        x = Functional.relu(self.layer_3(x))
-        x = self.dropout1(x)
-        x = self.layer_4(x)
-
-        return x
+        return self.model(x)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.configuration_dict['base_lr'], weight_decay=1e-2)
@@ -71,33 +73,30 @@ class LitModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         X = batch
-
         #output = torch.empty(X.shape[1], 1, dtype=torch.double)
         output = self(X[0,:].view(-1)) 
         output = output.reshape(len(output), 1)
-
         loss = self.NLL.apply(output, self.initD, self.mu_sa, self.muE, self.F, self.mdp_data)
         evd = self.NLL.calculate_EVD(self.truep, torch.matmul(self.F, output))
         #self.learned_feature_weights = output #store current
-        self.log('train_loss', loss)
-        self.log('train_evd', evd)
+        tensorboard_writer.add_scalar('train_loss',loss,batch_idx)
+        tensorboard_writer.add_scalar('train_evd',evd,batch_idx)
         return loss
 
 
 if __name__ == "__main__":
 
+    # Detect if benchmark specified
     if len(sys.argv) > 1:
-        worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
+        worldtype = str(sys.argv[1]) 
         user_input = True
     else:
         user_input = False
 
-      
-    task = Task.init(project_name='MSci-Project', task_name='LitModel Run, n=8, b=1, normal') #init task on ClearML
-    configuration_dict = {'number_of_epochs': 1, 'base_lr': 0.05, 'i2': 32, 'h1_out': 32, 'h2_out': 32} #set config params for clearml
-    configuration_dict = task.connect(configuration_dict)
+    # Initalise task on clearML
+    task = Task.init(project_name='MSci-Project', task_name='LitModel Run, n=8, b=1, t=350, no noise')
     
-    #load variables from file
+    # Load variables
     open_file = open("NNIRL_param_list.pkl", "rb")
     NNIRL_param_list = pickle.load(open_file)
     open_file.close()
@@ -117,103 +116,145 @@ if __name__ == "__main__":
     mdp_solution = NNIRL_param_list[13] 
     feature_data = NNIRL_param_list[14] 
     trueNLL = NNIRL_param_list[15]
-    NLL = NLLFunction()  # initialise NLL
-    #assign constants
+
+    # Connect configuration dict
+    configuration_dict = {'number_of_epochs': 2, 'base_lr': 0.05, 'p': 0.02, 'no_hidden_layers': 3, 'no_neurons_in_hidden_layers': len(feature_data['splittable'][0])*2 } #set config params for clearml
+    configuration_dict = task.connect(configuration_dict)
+
+    # Initialise Loss Function & Assign Constants
+    NLL = NLLFunction()  
     NLL.F = feature_data['splittable']
     NLL.muE = muE
     NLL.mu_sa = mu_sa
     NLL.initD = initD
     NLL.mdp_data = mdp_data
 
+
+    # Load features
     train_loader = torch.utils.data.DataLoader(feature_data['splittable'], num_workers = 8)
+    
+    # Define trainer
     trainer = pl.Trainer(max_epochs=configuration_dict['number_of_epochs'])
 
-    model = LitModel(len(feature_data['splittable'][0]), configuration_dict) #init model
-
-    #assign constants
-    model.NLL = NLL
-    model.F = feature_data['splittable']
-    model.muE = muE
-    model.mu_sa = mu_sa
-    model.initD = initD
-    model.mdp_data = mdp_data
-    model.truep = truep
-    model.configuration_dict = configuration_dict
+    # Define networks
+    model2 = [LitModel(len(feature_data['splittable'][0]), 'relu', configuration_dict), 
+              LitModel(len(feature_data['splittable'][0]), 'tanh', configuration_dict)] #init model
     
-    print("\nTrue R has:\n - negated likelihood: {}\n - EVD: {}".format(trueNLL,  NLL.calculate_EVD(truep, r)))
+    # Assign constants
+    for model in model2:
+        model.NLL = NLL
+        model.F = feature_data['splittable']
+        model.muE = muE
+        model.mu_sa = mu_sa
+        model.initD = initD
+        model.mdp_data = mdp_data
+        model.truep = truep
+        model.configuration_dict = configuration_dict
 
-    #train model
+    
+    # Train models
     start_time = time.time()
-    trainer.fit(model, train_loader)
+    [trainer.fit(model, train_loader) for model in model2]
     run_time = (time.time() - start_time)
+    print('\n... Finished training models ...\n')
+
+    # Save models
     PATH = './NN_IRL.pth'
-    torch.save(model.state_dict(), PATH)
+    for ind, model in enumerate(model2):
+        torch.save(model.model, 'IRL_model_'+str(ind)+'.pth') #maybe change to just PATH
     tensorboard_writer.close()
+    
 
-    #make predictions with learned model
-    T = 100
-    pred_reward = torch.empty(len(feature_data['splittable'][0]), 1)
+    T = 350 # Number of samples
+    irl_models = [torch.load('IRL_model_'+str(ind)+'.pth') for ind in [0,1]] # Load models
+
+    # Make predicitons w/ trained models
+    print('\n... Making predictions w/ trained models ...\n')
     for i in range(len(feature_data['splittable'])):
-        #get predictions
-        pred_reward = torch.matmul(feature_data['splittable'], model(feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1))
-        #generate array of T predicitons using the dropout model
-        Yt_hat = np.array([torch.matmul(feature_data['splittable'],model(feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1)).data.cpu().numpy() for _ in range(T)]).squeeze()
+        Yt_hat_relu = np.array([torch.matmul(feature_data['splittable'],irl_models[0](feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1)).data.cpu().numpy() for _ in range(T)]).squeeze()
+        Yt_hat_tanh = np.array([torch.matmul(feature_data['splittable'],irl_models[1](feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1)).data.cpu().numpy() for _ in range(T)]).squeeze()
 
-    y_mc = Yt_hat.mean(axis=0)
-    y_mc_std = Yt_hat.std(axis=0)
+    # Extract mean and std of predictions
+    y_mc_relu = Yt_hat_relu.mean(axis=0)
+    y_mc_std_relu = Yt_hat_relu.std(axis=0)
 
-    print('y_mc_std', y_mc_std)
+    y_mc_tanh = Yt_hat_tanh.mean(axis=0)
+    y_mc_std_tanh = Yt_hat_tanh.std(axis=0)
 
-    #convert y_mc to full reward
-    if(y_mc.size != (mdp_data['states'],5)):
-        y_mc_reward = torch.from_numpy(y_mc)
-        y_mc_reward = y_mc_reward.reshape(len(y_mc_reward), 1)
-        y_mc_reward = y_mc_reward.repeat((1, 5))
 
-    #convert pred_features to full reward
-    if(pred_reward.shape != (mdp_data['states'],5)):
-        predictedR = pred_reward.reshape(len(pred_reward), 1)
-        predictedR = predictedR.repeat((1, 5))
+    """
+    #Scale everything within 0 and 1
+    scaler = MinMaxScaler()
+    y_mc_relu = scaler.fit_transform(y_mc_relu.reshape(-1,1))
+    y_mc_std_relu = scaler.fit_transform(y_mc_std_relu.reshape(-1,1))
+    y_mc_tanh = scaler.fit_transform(y_mc_tanh.reshape(-1,1))
+    y_mc_std_tanh = scaler.fit_transform(y_mc_std_tanh.reshape(-1,1))
+    r = torch.tensor(scaler.fit_transform(r.data.cpu().numpy()))
+    """
 
-    predictedv, predictedq, predictedlogp, predictedP = linearvalueiteration(mdp_data, predictedR)
-    print("\nPredicted R has:\n - negated likelihood: {}\n - EVD: {}".format(NLL.apply(predictedR, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, predictedR )))
-    print("\n y_mc_reward R has:\n - negated likelihood: {}\n - EVD: {}".format(NLL.apply(y_mc_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, y_mc_reward )))
+    # Extract full reward functions
+    y_mc_relu_reward = torch.from_numpy(y_mc_relu)
+    y_mc_relu_reward = y_mc_relu_reward.reshape(len(y_mc_relu_reward), 1)
+    y_mc_relu_reward = y_mc_relu_reward.repeat((1, 5))
 
-    #plot regression line with uncertainty shading
+    y_mc_tanh_reward = torch.from_numpy(y_mc_tanh)
+    y_mc_tanh_reward = y_mc_tanh_reward.reshape(len(y_mc_tanh_reward), 1)
+    y_mc_tanh_reward = y_mc_tanh_reward.repeat((1, 5))
+
+    #Solve with learned reward functions
+    y_mc_relu_v, y_mc_relu_q, y_mc_relu_logp, y_mc_relu_P = linearvalueiteration(mdp_data, y_mc_relu_reward)
+    y_mc_tanh_v, y_mc_tanh_q, y_mc_tanh_logp, y_mc_tanh_P = linearvalueiteration(mdp_data, y_mc_tanh_reward)
+
+    # Print results
+    print("\nTrue R has:\n - negated likelihood: {}\n - EVD: {}".format(trueNLL,  NLL.calculate_EVD(truep, r)))
+    print("\nPred R with ReLU activation has:\n - negated likelihood: {}\n - EVD: {}".format(NLL.apply(y_mc_relu_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, y_mc_relu_reward)))
+    print("\nPred R with TanH activation has:\n - negated likelihood: {}\n - EVD: {}\n".format(NLL.apply(y_mc_tanh_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, y_mc_tanh_reward)))
+
+    # Plot regression line w/ uncertainty shading
     f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
-    ax1.plot(np.arange(1,len(feature_data['splittable'])+1,1), y_mc, alpha=0.8)
-    ax1.fill_between(np.arange(1,len(feature_data['splittable'])+1,1), y_mc-2*y_mc_std, y_mc+2*y_mc_std, alpha=0.3)
-    ax1.set_title('mean from ensemble')
-    ax1.set_xlabel('state')
-    ax1.set_ylabel('reward')
-    ax2.plot(np.arange(1,len(feature_data['splittable'])+1,1), pred_reward.detach().numpy().squeeze(), alpha=0.8)
-    ax2.fill_between(np.arange(1,len(feature_data['splittable'])+1,1), pred_reward.detach().numpy().squeeze()-2*y_mc_std, pred_reward.detach().numpy().squeeze()+2*y_mc_std, alpha=0.3)
-    ax2.set_title('predicited')
-    ax2.set_xlabel('state')
+    ax1.plot(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_relu, alpha=0.8)
+    ax1.fill_between(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_relu-2*y_mc_std_relu, y_mc_relu+2*y_mc_std_relu, alpha=0.3)
+    ax1.set_title('w/ ReLU non-linearities')
+    ax1.set_xlabel('State')
+    ax1.set_ylabel('Reward')
+
+    ax2.plot(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_tanh, alpha=0.8)
+    ax2.fill_between(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_tanh-2*y_mc_std_tanh, y_mc_tanh+2*y_mc_std_tanh, alpha=0.3)
+    ax2.set_title('w/ TanH non-linearities')
+    ax2.set_xlabel('State')
     plt.show()
 
-    #convert y_mc_std to correct size
-    if(y_mc_std.size != (mdp_data['states'],5)):
-        y_mc_std_resized = torch.from_numpy(y_mc_std)
-        y_mc_std_resized = y_mc_std_resized.reshape(len(y_mc_std_resized), 1)
-        y_mc_std_resized = y_mc_std_resized.repeat((1, 5))
+    # Convert std arrays to correct size for final figures
+    y_mc_std_relu_resized = torch.from_numpy(y_mc_std_relu)
+    y_mc_std_relu_resized = y_mc_std_relu_resized.reshape(len(y_mc_std_relu_resized), 1)
+    y_mc_std_relu_resized = y_mc_std_relu_resized.repeat((1, 5))
 
-    irl_result = { #predicted results
-        'r': predictedR,
-        'v': predictedv,
-        'p': predictedP,
-        'q': predictedq,
-        'r_itr': [predictedR],
-        #'model_itr': [pred_feature_weights], #commented since pred_feature_weights replaced by pred_reward due to matmul in the eval loop
-        'model_r_itr': [predictedR],
-        'p_itr': [predictedP],
-        'model_p_itr':[predictedP],
-        'time': run_time,
-        'uncertainty': y_mc_std_resized
+    y_mc_std_tanh_resized = torch.from_numpy(y_mc_std_tanh)
+    y_mc_std_tanh_resized = y_mc_std_tanh_resized.reshape(len(y_mc_std_tanh_resized), 1)
+    y_mc_std_tanh_resized = y_mc_std_tanh_resized.repeat((1, 5))
+
+
+    # Result dict for predicitons with ReLU non-linearities
+    irl_result_relu = { 
+        'r': y_mc_relu_reward,
+        'v': y_mc_relu_v,
+        'p': y_mc_relu_P,
+        'q': y_mc_relu_q,
+        'r_itr': [y_mc_relu_reward],
+        'model_r_itr': [y_mc_relu_reward],
+        'p_itr': [y_mc_relu_P],
+        'model_p_itr':[y_mc_relu_P],
+        #'time': run_time,
+        'uncertainty': y_mc_std_relu_resized,
+        'truth_figure_title': 'Truth R & P',
+        'pred_reward_figure_title': 'Pred R & P w/ ReLU non-linearities',
+        'uncertainty_figure_title': 'Uncertainty w/ ReLU non-linearities',
+        #'model_itr': [pred_feature_weights], #commented since feature weights never returned, only final R to matmul with features in the eval loop
     }
 
-    test_result = { #ground truth metrics
-        'irl_result': irl_result,
+    # Ground truth dict for predicitons with ReLU non-linearities
+    test_result_relu = { 
+        'irl_result': irl_result_relu,
         'true_r': r,
         'example_samples': [example_samples],
         'mdp_data': mdp_data,
@@ -222,15 +263,52 @@ if __name__ == "__main__":
         'feature_data': feature_data
     }
 
+    # Result dict for predicitons with TanH non-linearities
+    irl_result_tanh = { 
+        'r': y_mc_tanh_reward,
+        'v': y_mc_tanh_v,
+        'p': y_mc_tanh_P,
+        'q': y_mc_tanh_q,
+        'r_itr': [y_mc_tanh_reward],
+        'model_r_itr': [y_mc_tanh_reward],
+        'p_itr': [y_mc_tanh_P],
+        'model_p_itr':[y_mc_tanh_P],
+        #'time': run_time,
+        'uncertainty': y_mc_std_tanh_resized,
+        'truth_figure_title': 'Truth R & P',
+        'pred_reward_figure_title': 'Pred R & P w/ TanH non-linearities',
+        'uncertainty_figure_title': 'Uncertainty w/ TanH non-linearities',
+        #'model_itr': [pred_feature_weights], #commented since feature weights never returned, only final R to matmul with features in the eval loop
+    }
 
-    #call respective draw method
+    # Ground truth dict for predicitons with Tanh non-linearities
+    test_result_tanh = { 
+        'irl_result': irl_result_tanh,
+        'true_r': r,
+        'example_samples': [example_samples],
+        'mdp_data': mdp_data,
+        'mdp_params': mdp_params,
+        'mdp_solution': mdp_solution,
+        'feature_data': feature_data
+    }
+
+    # Plot final figures for predicitons with ReLU non-linearities
     if(user_input):
         if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
-            gwVisualise(test_result)
+            gwVisualise(test_result_relu)
         elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
-            owvisualise(test_result)
+            owvisualise(test_result_relu)
     else:
-        gwVisualise(test_result)
+        gwVisualise(test_result_relu)
+
+    # Plot final figures for predicitons with TanH non-linearities
+    if(user_input):
+        if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
+            gwVisualise(test_result_tanh)
+        elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
+            owvisualise(test_result_tanh)
+    else:
+        gwVisualise(test_result_tanh)
     
 
 

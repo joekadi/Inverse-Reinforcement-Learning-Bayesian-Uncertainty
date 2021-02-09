@@ -15,11 +15,12 @@ optimizer = HyperParameterOptimizer(
     # here we define the hyper-parameters to optimize
     hyper_parameters=[
         UniformIntegerParameterRange('number_of_epochs', min_value=1, max_value=4, step_size=1),
-        UniformIntegerParameterRange('i2', min_value=16, max_value=30, step_size=1),
-        UniformIntegerParameterRange('h1_out', min_value=16, max_value=30, step_size=1),
-        UniformIntegerParameterRange('h2_out', min_value=16, max_value=30, step_size=1),
         UniformParameterRange('base_lr', min_value=0.005, max_value=0.1, step_size=0.05),
+        UniformParameterRange('p', min_value=0.01, max_value=0.7, step_size=0.05),
+        UniformIntegerParameterRange('no_hidden_layers', min_value=1, max_value=8, step_size=1),
+        UniformIntegerParameterRange('no_neurons_in_hidden_layers', min_value=16, max_value=64, step_size=2),
     ],
+
     # setting the objective metric we want to maximize/minimize
     objective_metric_title='loss',
     objective_metric_series='loss',

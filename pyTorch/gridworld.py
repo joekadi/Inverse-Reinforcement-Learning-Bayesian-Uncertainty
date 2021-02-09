@@ -109,9 +109,9 @@ def gwVisualise(test_result):
     # Draw uncertainty for IRL result
     gridworlddraw(test_result['irl_result']['uncertainty'],test_result['irl_result']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax3)
 
-    ax1.set_title("Ground Truth Reward & Policy")
-    ax2.set_title("Predicted Reward & Policy")
-    ax3.set_title("Prediction Uncertainty & Policy")
+    ax1.set_title(test_result['irl_result']['truth_figure_title'])
+    ax2.set_title(test_result['irl_result']['pred_reward_figure_title'])
+    ax3.set_title(test_result['irl_result']['uncertainty_figure_title'])
 
     plt.show()
 
