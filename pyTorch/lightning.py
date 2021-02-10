@@ -151,7 +151,7 @@ if __name__ == "__main__":
         model.truep = truep
         model.configuration_dict = configuration_dict
 
-    
+    '''
     # Train models
     start_time = time.time()
     [trainer.fit(model, train_loader) for model in model2]
@@ -163,9 +163,9 @@ if __name__ == "__main__":
     for ind, model in enumerate(model2):
         torch.save(model.model, 'IRL_model_'+str(ind)+'.pth') #maybe change to just PATH
     tensorboard_writer.close()
-    
+    '''
 
-    T = 350 # Number of samples
+    T = 10 # Number of samples
     irl_models = [torch.load('IRL_model_'+str(ind)+'.pth') for ind in [0,1]] # Load models
 
     # Make predicitons w/ trained models
@@ -209,7 +209,7 @@ if __name__ == "__main__":
     print("\nTrue R has:\n - negated likelihood: {}\n - EVD: {}".format(trueNLL,  NLL.calculate_EVD(truep, r)))
     print("\nPred R with ReLU activation has:\n - negated likelihood: {}\n - EVD: {}".format(NLL.apply(y_mc_relu_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, y_mc_relu_reward)))
     print("\nPred R with TanH activation has:\n - negated likelihood: {}\n - EVD: {}\n".format(NLL.apply(y_mc_tanh_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, y_mc_tanh_reward)))
-
+    '''
     # Plot regression line w/ uncertainty shading
     f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
     ax1.plot(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_relu, alpha=0.8)
@@ -224,6 +224,7 @@ if __name__ == "__main__":
     ax2.set_xlabel('State')
     plt.show()
 
+    '''
     # Convert std arrays to correct size for final figures
     y_mc_std_relu_resized = torch.from_numpy(y_mc_std_relu)
     y_mc_std_relu_resized = y_mc_std_relu_resized.reshape(len(y_mc_std_relu_resized), 1)

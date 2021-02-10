@@ -141,20 +141,41 @@ def gridworlddraw(r,p,g,mdp_params, mdp_data, f, ax):
         ax.set_yticks(np.arange(0, crop[1,1]-crop[1,0]+2))
 
     #daspect[1 1 1]
-
+    
     #Draw the reward function
     for y in range(crop[1,0], crop[1,1]+1):
-        for x in range(crop[0,0], crop[0,1]+1):
+        #print('y', y)
+        for x in range(crop[0,0]-1, crop[0,1]):
+            #print('x', x)
+            print('xy', (x-crop[0,0]+1,y-crop[1,0]))
+
+            if rngr == 0:
+                v = 0.0
+            else:
+                v = (torch.mean( r[(y-1)*n+x,:])-minr)/rngr
+                v = v.item()
+            colour = np.array([v,v,v])
+            
+            
+            colour = np.minimum( np.ones((1,3))   ,  np.maximum(np.zeros((1,3)) , colour))
+            rect = patches.Rectangle(xy = (x-crop[0,0]+1,y-crop[1,0]),width=1,height=1,facecolor=colour[0]) #create rectangle patches
+            ax.add_patch(rect) # Add the patch to the Axes
+    
+    '''
+    #Draw the reward function
+    for y in range(crop[2,1], crop[2,2]):
+        for x in range(crop[1,1], crop[1,2]):
             
             if rngr == 0:
                 v = 0.0
             else:
-                v = (torch.mean( r[(y-2)*n+x,:])-minr)/rngr
+                v = (torch.mean( r[(y-2)*n+x,:], 2)-minr)/rngr
                 v = v.item()
             colour = np.array([v,v,v])
             colour = np.minimum( np.ones((1,3))   ,  np.maximum(np.zeros((1,3)) , colour))
-            rect = patches.Rectangle(xy = (x-crop[0,0],y-crop[1,0]),width=1,height=1,facecolor=colour[0]) #create rectangle patches
+            rect = patches.Rectangle(xy = (x-crop[1,1],y-crop[2,1]),width=1,height=1,facecolor=colour[0]) #create rectangle patches
             ax.add_patch(rect) # Add the patch to the Axes
+    '''
 
     if isinstance(g, list):
         print('g contains example traces - just draw those.')
