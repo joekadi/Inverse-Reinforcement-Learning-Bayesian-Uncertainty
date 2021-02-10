@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 import time
 import math as math
+import random
 import torchvision
 import torchvision.transforms as transforms
 from clearml import Task
@@ -93,8 +94,13 @@ if __name__ == "__main__":
     else:
         user_input = False
 
+    noisey_features= False
+    train_models = True
+    noisey_paths = False
+    state_to_remove = 36
+
     # Initalise task on clearML
-    task = Task.init(project_name='MSci-Project', task_name='LitModel Run, n=8, b=1, t=350, no noise')
+    task = Task.init(project_name='MSci-Project', task_name='LitModel Run, n=8, b=1, t=1000, no noise')
     
     # Load variables
     open_file = open("NNIRL_param_list.pkl", "rb")
@@ -117,18 +123,43 @@ if __name__ == "__main__":
     feature_data = NNIRL_param_list[14] 
     trueNLL = NNIRL_param_list[15]
 
+    # Initalise loss function
+    NLL = NLLFunction()
+
+
+    # Remove chosen state from paths
+    if noisey_paths:
+        print('\n... removing state', state_to_remove, 'from paths ...\n')
+        N = len(example_samples)
+        for path in example_samples:
+            T = len(path)
+            pathindex = example_samples.index(path)
+            for move in path:
+                moveindex = example_samples[pathindex].index(move)
+                #remove state
+                if move[0] == state_to_remove:
+                    newmove = (random.randint(0, len(feature_data['splittable'][0]-1)), move[1])
+                    example_samples[pathindex][moveindex] = newmove                
+        initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples, feature_data)  # calculate required variables
+
+    # Add noise to features
+    if noisey_features:
+        #add noise to features at states 12, 34 and 64 (when mdp_params.n=8)
+        print('\n... adding noise to features at states 12, 34 and 64 ...\n')
+        feature_data['splittable'][11,:] = torch.rand(feature_data['splittable'].shape[1])
+        feature_data['splittable'][33,:] = torch.rand(feature_data['splittable'].shape[1])
+        feature_data['splittable'][63,:] = torch.rand(feature_data['splittable'].shape[1])
+
     # Connect configuration dict
     configuration_dict = {'number_of_epochs': 2, 'base_lr': 0.05, 'p': 0.02, 'no_hidden_layers': 3, 'no_neurons_in_hidden_layers': len(feature_data['splittable'][0])*2 } #set config params for clearml
     configuration_dict = task.connect(configuration_dict)
 
-    # Initialise Loss Function & Assign Constants
-    NLL = NLLFunction()  
+    # Assign loss function constants
     NLL.F = feature_data['splittable']
     NLL.muE = muE
     NLL.mu_sa = mu_sa
     NLL.initD = initD
     NLL.mdp_data = mdp_data
-
 
     # Load features
     train_loader = torch.utils.data.DataLoader(feature_data['splittable'], num_workers = 8)
@@ -151,28 +182,28 @@ if __name__ == "__main__":
         model.truep = truep
         model.configuration_dict = configuration_dict
 
-    '''
     # Train models
-    start_time = time.time()
-    [trainer.fit(model, train_loader) for model in model2]
-    run_time = (time.time() - start_time)
-    print('\n... Finished training models ...\n')
+    if train_models:
+        start_time = time.time()
+        [trainer.fit(model, train_loader) for model in model2]
+        run_time = (time.time() - start_time)
+        print('\n... Finished training models ...\n')
 
     # Save models
     PATH = './NN_IRL.pth'
     for ind, model in enumerate(model2):
         torch.save(model.model, 'IRL_model_'+str(ind)+'.pth') #maybe change to just PATH
     tensorboard_writer.close()
-    '''
+    
 
-    T = 10 # Number of samples
+    T = 1000 # Number of samples
     irl_models = [torch.load('IRL_model_'+str(ind)+'.pth') for ind in [0,1]] # Load models
 
     # Make predicitons w/ trained models
     print('\n... Making predictions w/ trained models ...\n')
     for i in range(len(feature_data['splittable'])):
         Yt_hat_relu = np.array([torch.matmul(feature_data['splittable'],irl_models[0](feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1)).data.cpu().numpy() for _ in range(T)]).squeeze()
-        Yt_hat_tanh = np.array([torch.matmul(feature_data['splittable'],irl_models[1](feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1)).data.cpu().numpy() for _ in range(T)]).squeeze()
+        Yt_hat_tanh = np.array([torch.matmul(feature_data['splittable'], irl_models[1](feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1)).data.cpu().numpy() for _ in range(T)]).squeeze()
 
     # Extract mean and std of predictions
     y_mc_relu = Yt_hat_relu.mean(axis=0)
@@ -181,8 +212,7 @@ if __name__ == "__main__":
     y_mc_tanh = Yt_hat_tanh.mean(axis=0)
     y_mc_std_tanh = Yt_hat_tanh.std(axis=0)
 
-
-    """
+    '''
     #Scale everything within 0 and 1
     scaler = MinMaxScaler()
     y_mc_relu = scaler.fit_transform(y_mc_relu.reshape(-1,1))
@@ -190,7 +220,7 @@ if __name__ == "__main__":
     y_mc_tanh = scaler.fit_transform(y_mc_tanh.reshape(-1,1))
     y_mc_std_tanh = scaler.fit_transform(y_mc_std_tanh.reshape(-1,1))
     r = torch.tensor(scaler.fit_transform(r.data.cpu().numpy()))
-    """
+    '''
 
     # Extract full reward functions
     y_mc_relu_reward = torch.from_numpy(y_mc_relu)
@@ -209,7 +239,8 @@ if __name__ == "__main__":
     print("\nTrue R has:\n - negated likelihood: {}\n - EVD: {}".format(trueNLL,  NLL.calculate_EVD(truep, r)))
     print("\nPred R with ReLU activation has:\n - negated likelihood: {}\n - EVD: {}".format(NLL.apply(y_mc_relu_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, y_mc_relu_reward)))
     print("\nPred R with TanH activation has:\n - negated likelihood: {}\n - EVD: {}\n".format(NLL.apply(y_mc_tanh_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, y_mc_tanh_reward)))
-    '''
+   
+    
     # Plot regression line w/ uncertainty shading
     f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
     ax1.plot(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_relu, alpha=0.8)
@@ -224,7 +255,6 @@ if __name__ == "__main__":
     ax2.set_xlabel('State')
     plt.show()
 
-    '''
     # Convert std arrays to correct size for final figures
     y_mc_std_relu_resized = torch.from_numpy(y_mc_std_relu)
     y_mc_std_relu_resized = y_mc_std_relu_resized.reshape(len(y_mc_std_relu_resized), 1)

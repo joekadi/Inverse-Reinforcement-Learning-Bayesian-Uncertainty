@@ -508,7 +508,7 @@ else:
 final_figures = True
 NLL_EVD_plots = False 
 heatmapplots = False
-new_paths = True
+new_paths = False
 noisey_features = False
 
 if new_paths:
@@ -543,30 +543,34 @@ if new_paths:
     example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
     print("\n... done sampling", N, "paths ...")
 
+
+
+
 NLL = NLLFunction()  # initialise NLL
 if new_paths:
     initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples, feature_data)  # calculate required variables
 else:
     print("\n... using pre-loaded sampled paths ...")
-    #load variables from file
+    # Load variables
     open_file = open("NNIRL_param_list.pkl", "rb")
     NNIRL_param_list = pickle.load(open_file)
     open_file.close()
     threshold = NNIRL_param_list[0]
     optim_type = NNIRL_param_list[1]
     net = NNIRL_param_list[2]
-    X = NNIRL_param_list[3]
-    initD = NNIRL_param_list[4]
-    mu_sa = NNIRL_param_list[5]
-    muE = NNIRL_param_list[6]
-    F = NNIRL_param_list[7]
-    #F = F.type(torch.DoubleTensor)
-    mdp_data = NNIRL_param_list[8]
-    configuration_dict = NNIRL_param_list[9]
-    truep = NNIRL_param_list[10] 
-    NLL_EVD_plots = NNIRL_param_list[11]
-    example_samples = NNIRL_param_list[12]
-    noisey_features = NNIRL_param_list[13]
+    initD = NNIRL_param_list[3]
+    mu_sa = NNIRL_param_list[4]
+    muE = NNIRL_param_list[5]
+    mdp_data = NNIRL_param_list[6]
+    truep = NNIRL_param_list[7] 
+    NLL_EVD_plots = NNIRL_param_list[8]
+    example_samples = NNIRL_param_list[9]
+    noisey_features = NNIRL_param_list[10] 
+    mdp_params = NNIRL_param_list[11] 
+    r = NNIRL_param_list[12] 
+    mdp_solution = NNIRL_param_list[13] 
+    feature_data = NNIRL_param_list[14] 
+    trueNLL = NNIRL_param_list[15]
 
 # assign constant class variable
 NLL.F = F
