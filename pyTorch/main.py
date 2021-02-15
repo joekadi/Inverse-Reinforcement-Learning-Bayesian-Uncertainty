@@ -508,8 +508,8 @@ else:
 final_figures = True
 NLL_EVD_plots = False 
 heatmapplots = False
-new_paths = False
-noisey_features = False
+new_paths = True
+normalise = True
 
 if new_paths:
     print('\n ... new paths will be sampled and dumped to NNIRL_param_list.pkl this run ...\n')
@@ -517,18 +517,26 @@ else:
     print('\n ... loading paths and params from NNIRL_param_list.pkl ...\n')
 
 
-N = 16 #number of sampled trajectories
-T = 8 #number of actions in each trajectory
+N = 32 #number of sampled trajectories
+T = 16 #number of actions in each trajectory
 
 # Generate mdp and R
 # Will always produce constant results due to constant random seed param
 if(user_input):
     if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
+        print('\n... Creating GridWorld ...\n')
         mdp_data, r, feature_data, mdp_params = create_gridworld()
     elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
+        print('\n... Creating ObjectWorld ...\n')
         mdp_data, r, feature_data, true_feature_map, mdp_params = create_objectworld()
 else:
+    worldtype = 'gridworld'
+    print('\n... Creating GridWorld ...\n')
     mdp_data, r, feature_data, mdp_params = create_gridworld()
+
+if normalise:
+    scaler = MinMaxScaler()
+    r = torch.tensor(scaler.fit_transform(r.data.cpu().numpy()))
 
 #Solve MDP
 print("\n... performing value iteration for v, q, logp and truep ...")
@@ -542,8 +550,6 @@ if new_paths:
     print("\n... sampling paths from true R ...")
     example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
     print("\n... done sampling", N, "paths ...")
-
-
 
 
 NLL = NLLFunction()  # initialise NLL
@@ -565,12 +571,14 @@ else:
     truep = NNIRL_param_list[7] 
     NLL_EVD_plots = NNIRL_param_list[8]
     example_samples = NNIRL_param_list[9]
-    noisey_features = NNIRL_param_list[10] 
-    mdp_params = NNIRL_param_list[11] 
-    r = NNIRL_param_list[12] 
-    mdp_solution = NNIRL_param_list[13] 
-    feature_data = NNIRL_param_list[14] 
-    trueNLL = NNIRL_param_list[15]
+    mdp_params = NNIRL_param_list[10] 
+    r = NNIRL_param_list[11] 
+    mdp_solution = NNIRL_param_list[12] 
+    feature_data = NNIRL_param_list[13] 
+    trueNLL = NNIRL_param_list[14]
+    normalise = NNIRL_param_list[15]
+    user_input = NNIRL_param_list[16]
+    worldtype = NNIRL_param_list[17]
 
 # assign constant class variable
 NLL.F = F
@@ -589,10 +597,10 @@ trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
 #run single NN 
 #single_net, feature_weights, run_time = run_single_NN()
 
-
 if new_paths:
+    print('\n... Saving new variables ...\n')
     #save params for NNIRL to file
-    NNIRL_param_list = [0.01, "Adam", mynet, initD, mu_sa, muE, mdp_data, truep, NLL_EVD_plots, example_samples, noisey_features, mdp_params, r, mdp_solution, feature_data, trueNLL]
+    NNIRL_param_list = [0.01, "Adam", mynet, initD, mu_sa, muE, mdp_data, truep, NLL_EVD_plots, example_samples, mdp_params, r, mdp_solution, feature_data, trueNLL, normalise, user_input, worldtype]
     file_name = "NNIRL_param_list.pkl"
     open_file = open(file_name, "wb")
     pickle.dump(NNIRL_param_list, open_file)

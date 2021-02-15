@@ -3,6 +3,7 @@ import numpy as np
 import math as math
 import random
 from scipy import sparse as sps
+from gridworld import *
 
 torch.set_printoptions(precision=5)
 
@@ -11,7 +12,7 @@ def objectworldbuild(mdp_params):
     '''
     mdp_params - parameters of the objectworld:
     seed (0) - initialization for random seed
-    n (32) - number of cells along each axis
+    n (16) - number of cells along each axis
     placement_prob (0.05) - probability of placing object in each cell
     c1 (2) - number of primary "colors"
     c2 (2) - number of secondary "colors"
@@ -205,9 +206,10 @@ def objectworldfeatures(mdp_params, mdp_data):
     if mdp_params['continuous']:
         feature_data['splittable'] = splittablecont
 
-    #Construct true feature map.
-    
+    #Construct true feature map
     fm_indptr = np.zeros((int(mdp_params['r_tree']['total_leaves']+1)))
+
+
     true_feature_map = sps.csc_matrix(([], [], fm_indptr), shape=(int(mdp_data['states']),  int(mdp_params['r_tree']['total_leaves'])))
     for s in range(int(mdp_data['states'])):
         #Determine which leaf state belongs to
@@ -266,16 +268,82 @@ def cartaverage(tree,feature_data):
 
 def create_objectworld():
     print("\n ... generating objectworld MDP and intial R ...")
-    mdp_params = {'n': 32, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.9, 'seed': 0, 'r_tree': None}
+    mdp_params = {'n': 16, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.9, 'seed': 0, 'r_tree': None}
     step = mdp_params['c1'] + mdp_params['c2']
+    
     r_tree = {'type': 1, 'test':1+step*2, 'total_leaves':3,           # Test distance to c1 1 shape
         'ltTree':{'type':0, 'index': 0,'mean':[0,0,0,0,0]},           # Neutral reward for being elsewhere
         'gtTree': {'type':1,'test':2+step*1,'total_leaves':2,         # Test distance to c1 2 shape
             'gtTree':{'type':0, 'index':1,'mean':[1,1,1,1,1]},        # Reward for being close
             'ltTree':{'type':0,'index':2,'mean':[-2,-2,-2,-2,-2]}}}   # Penalty otherwise
-    mdp_params['r_tree'] = r_tree,
+   
+    mdp_params['r_tree'] = r_tree
    
     mdp_data, r, feature_data, true_feature_map = objectworldbuild(mdp_params)
     print("\n... done ...")
     return mdp_data, r, feature_data, true_feature_map, mdp_params
 
+def owVisualise(test_result):
+
+    # Compute visible examples.
+    Eo = torch.zeros(int(test_result['mdp_data']['states']),1)
+    for i in range(len(test_result['example_samples'][0])):
+        for t in range(len(test_result['example_samples'][0][0])):
+            Eo[test_result['example_samples'][0][i][t][0]] = 1
+    g = torch.ones(int(test_result['mdp_data']['states']),1)*0.5+Eo*0.5
+
+    #Create figure.
+    f, (ax1, ax2, ax3) = plt.subplots(1, 3, sharex=True)
+        
+    #Draw reward for ground truth.
+    objectworlddraw(test_result['true_r'],test_result['mdp_solution']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax1)
+
+    # Draw reward for IRL result.
+    objectworlddraw(test_result['irl_result']['r'],test_result['irl_result']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax2)
+    
+    # Draw uncertainty for IRL result
+    objectworlddraw(test_result['irl_result']['uncertainty'],test_result['irl_result']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax3)
+
+    ax1.set_title(test_result['irl_result']['truth_figure_title'])
+    ax2.set_title(test_result['irl_result']['pred_reward_figure_title'])
+    ax3.set_title(test_result['irl_result']['uncertainty_figure_title'])
+
+    plt.show()
+
+def objectworlddraw(r,p,g,mdp_params, mdp_data, f, ax):
+
+    #Use gridworld drawing function to draw paths and reward function
+    gridworlddraw(r,p,g,mdp_params, mdp_data, f, ax)
+
+    #Initialize colors.
+    shapeColours = plt.cm.jet( np.linspace(0,1, int(mdp_params['c1']+mdp_params['c2']))   )    
+
+    n = mdp_params['n']
+    if isinstance(g, list):
+        #This means p is crop
+        crop = p
+    else:
+        crop = np.array([[1, n], [1,n]])
+
+    #cast to np array for easier indexing
+    np_c1array = np.array(mdp_data['c1array'], dtype=object)
+
+    #Draw objects
+    for i in range(1, len(mdp_data['c1array'])+1):
+        for j in range(1, len(np_c1array[i-1][0])+1):
+            #Get colours and position of object
+            s = mdp_data['c1array'][i-1][0][j-1][0]
+            c1 = i-1
+            c2 = int(mdp_data['map2'][s][0].item())
+            y = math.ceil(s/n)
+            x = s-(y-1)*n
+
+            if x<crop[0,0] or x>crop[0,1] or y<crop[1,0] or y > crop[1,1]:
+                continue
+
+            x = x-crop[0,0]+1
+            y = y-crop[1,0]+1
+
+            #Draw the object
+            circle = patches.FancyBboxPatch(xy = (x-0.55,y-0.55),width=0.000000008,height=0.000000008, boxstyle='circle', facecolor=shapeColours[int(mdp_params['c1']+c2),:], edgecolor=shapeColours[int(c1),:], linewidth=2.0) #create rectangle patches
+            ax.add_patch(circle) # Add the patch to the Axes

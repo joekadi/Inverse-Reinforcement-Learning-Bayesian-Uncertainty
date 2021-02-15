@@ -87,17 +87,14 @@ class LitModel(pl.LightningModule):
 
 if __name__ == "__main__":
 
-    # Detect if benchmark specified
-    if len(sys.argv) > 1:
-        worldtype = str(sys.argv[1]) 
-        user_input = True
-    else:
-        user_input = False
 
     noisey_features= False
     train_models = True
     noisey_paths = False
+    plot_regression_line = False
     state_to_remove = 36
+
+    T = 1000 # Number of samples
 
     # Initalise task on clearML
     task = Task.init(project_name='MSci-Project', task_name='LitModel Run, n=8, b=1, t=1000, no noise')
@@ -116,16 +113,29 @@ if __name__ == "__main__":
     truep = NNIRL_param_list[7] 
     NLL_EVD_plots = NNIRL_param_list[8]
     example_samples = NNIRL_param_list[9]
-    noisey_features = NNIRL_param_list[10] 
-    mdp_params = NNIRL_param_list[11] 
-    r = NNIRL_param_list[12] 
-    mdp_solution = NNIRL_param_list[13] 
-    feature_data = NNIRL_param_list[14] 
-    trueNLL = NNIRL_param_list[15]
+    mdp_params = NNIRL_param_list[10] 
+    r = NNIRL_param_list[11] 
+    mdp_solution = NNIRL_param_list[12] 
+    feature_data = NNIRL_param_list[13] 
+    trueNLL = NNIRL_param_list[14]
+    normalise = NNIRL_param_list[15]
+    user_input = NNIRL_param_list[16]
+    worldtype = NNIRL_param_list[17]
 
+    #Print what benchmark
+    if(user_input):
+        if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
+            print('\n ... running on GridWorld benchmark ... \n')
+        elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
+            print('\n ... running on ObjectWorld benchmark ... \n')
+    else:
+        print('\n ... running on GridWorld benchmark ... \n')
+
+    #Print true R loss 
+    print('\n ... true reward loss is', trueNLL ,'... \n')
+    
     # Initalise loss function
     NLL = NLLFunction()
-
 
     # Remove chosen state from paths
     if noisey_paths:
@@ -168,8 +178,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer(max_epochs=configuration_dict['number_of_epochs'])
 
     # Define networks
-    model2 = [LitModel(len(feature_data['splittable'][0]), 'relu', configuration_dict), 
-              LitModel(len(feature_data['splittable'][0]), 'tanh', configuration_dict)] #init model
+    model2 = [LitModel(len(feature_data['splittable'][0]), 'relu', configuration_dict),LitModel(len(feature_data['splittable'][0]), 'tanh', configuration_dict)] #init model
     
     # Assign constants
     for model in model2:
@@ -189,14 +198,12 @@ if __name__ == "__main__":
         run_time = (time.time() - start_time)
         print('\n... Finished training models ...\n')
 
-    # Save models
-    PATH = './NN_IRL.pth'
-    for ind, model in enumerate(model2):
-        torch.save(model.model, 'IRL_model_'+str(ind)+'.pth') #maybe change to just PATH
-    tensorboard_writer.close()
+        # Save models
+        PATH = './NN_IRL.pth'
+        for ind, model in enumerate(model2):
+            torch.save(model.model, 'IRL_model_'+str(ind)+'.pth') #maybe change to just PATH
+        tensorboard_writer.close()
     
-
-    T = 1000 # Number of samples
     irl_models = [torch.load('IRL_model_'+str(ind)+'.pth') for ind in [0,1]] # Load models
 
     # Make predicitons w/ trained models
@@ -212,15 +219,17 @@ if __name__ == "__main__":
     y_mc_tanh = Yt_hat_tanh.mean(axis=0)
     y_mc_std_tanh = Yt_hat_tanh.std(axis=0)
 
-    '''
-    #Scale everything within 0 and 1
-    scaler = MinMaxScaler()
-    y_mc_relu = scaler.fit_transform(y_mc_relu.reshape(-1,1))
-    y_mc_std_relu = scaler.fit_transform(y_mc_std_relu.reshape(-1,1))
-    y_mc_tanh = scaler.fit_transform(y_mc_tanh.reshape(-1,1))
-    y_mc_std_tanh = scaler.fit_transform(y_mc_std_tanh.reshape(-1,1))
-    r = torch.tensor(scaler.fit_transform(r.data.cpu().numpy()))
-    '''
+
+    if normalise:
+        #Scale everything within 0 and 1
+        scaler = MinMaxScaler()
+
+        y_mc_relu = scaler.fit_transform(y_mc_relu.reshape(-1,1))
+        y_mc_std_relu = scaler.fit_transform(y_mc_std_relu.reshape(-1,1))
+        y_mc_tanh = scaler.fit_transform(y_mc_tanh.reshape(-1,1))
+        y_mc_std_tanh = scaler.fit_transform(y_mc_std_tanh.reshape(-1,1))
+    
+    
 
     # Extract full reward functions
     y_mc_relu_reward = torch.from_numpy(y_mc_relu)
@@ -235,25 +244,27 @@ if __name__ == "__main__":
     y_mc_relu_v, y_mc_relu_q, y_mc_relu_logp, y_mc_relu_P = linearvalueiteration(mdp_data, y_mc_relu_reward)
     y_mc_tanh_v, y_mc_tanh_q, y_mc_tanh_logp, y_mc_tanh_P = linearvalueiteration(mdp_data, y_mc_tanh_reward)
 
+
     # Print results
     print("\nTrue R has:\n - negated likelihood: {}\n - EVD: {}".format(trueNLL,  NLL.calculate_EVD(truep, r)))
     print("\nPred R with ReLU activation has:\n - negated likelihood: {}\n - EVD: {}".format(NLL.apply(y_mc_relu_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, y_mc_relu_reward)))
     print("\nPred R with TanH activation has:\n - negated likelihood: {}\n - EVD: {}\n".format(NLL.apply(y_mc_tanh_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), NLL.calculate_EVD(truep, y_mc_tanh_reward)))
    
-    
-    # Plot regression line w/ uncertainty shading
-    f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
-    ax1.plot(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_relu, alpha=0.8)
-    ax1.fill_between(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_relu-2*y_mc_std_relu, y_mc_relu+2*y_mc_std_relu, alpha=0.3)
-    ax1.set_title('w/ ReLU non-linearities')
-    ax1.set_xlabel('State')
-    ax1.set_ylabel('Reward')
 
-    ax2.plot(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_tanh, alpha=0.8)
-    ax2.fill_between(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_tanh-2*y_mc_std_tanh, y_mc_tanh+2*y_mc_std_tanh, alpha=0.3)
-    ax2.set_title('w/ TanH non-linearities')
-    ax2.set_xlabel('State')
-    plt.show()
+    if plot_regression_line:
+        # Plot regression line w/ uncertainty shading
+        f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+        ax1.plot(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_relu, alpha=0.8)
+        ax1.fill_between(np.arange(1,len(feature_data['splittable'])+1,1), (y_mc_relu-2*y_mc_std_relu).squeeze(), (y_mc_relu+2*y_mc_std_relu).squeeze(), alpha=0.3)
+        ax1.set_title('w/ ReLU non-linearities')
+        ax1.set_xlabel('State')
+        ax1.set_ylabel('Reward')
+
+        ax2.plot(np.arange(1,len(feature_data['splittable'])+1,1), y_mc_tanh, alpha=0.8)
+        ax2.fill_between(np.arange(1,len(feature_data['splittable'])+1,1), (y_mc_tanh-2*y_mc_std_tanh).squeeze(), (y_mc_tanh+2*y_mc_std_tanh).squeeze(), alpha=0.3)
+        ax2.set_title('w/ TanH non-linearities')
+        ax2.set_xlabel('State')
+        plt.show()
 
     # Convert std arrays to correct size for final figures
     y_mc_std_relu_resized = torch.from_numpy(y_mc_std_relu)
@@ -328,7 +339,7 @@ if __name__ == "__main__":
         if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
             gwVisualise(test_result_relu)
         elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
-            owvisualise(test_result_relu)
+            owVisualise(test_result_relu)
     else:
         gwVisualise(test_result_relu)
 
@@ -337,7 +348,7 @@ if __name__ == "__main__":
         if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
             gwVisualise(test_result_tanh)
         elif worldtype == "objectworld" or worldtype == "ow" or worldtype == "obj":
-            owvisualise(test_result_tanh)
+            owVisualise(test_result_tanh)
     else:
         gwVisualise(test_result_tanh)
     

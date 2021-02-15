@@ -194,7 +194,7 @@ def gridworlddrawagent(x,y,a,colour,f,ax):
     overlap = 0
     w = 1+(overlap)*0.5
     if (a == 0):
-       circle = patches.FancyBboxPatch(xy = (x-0.6,y-0.6),width=0.2,height=0.2, boxstyle='circle', facecolor=colour, linewidth= w) #create circle patches
+       circle = patches.FancyBboxPatch(xy = (x-0.5,y-0.5),width=0.000000008,height=0.000000008, boxstyle='circle', facecolor=colour, linewidth= w) #create circle patches
        ax.add_patch(circle) # Add the patch to the Axes
     else:
         if a == 4:
