@@ -9,9 +9,6 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import softplus
 import torch.nn.functional as F
-from nonlinearBNN import *
-from nonlinearnn import *
-from linearnn import *
 import matplotlib.pyplot as plt
 import seaborn as sns
 from torch.autograd import gradcheck
@@ -23,14 +20,13 @@ import os
 import sys
 from NLLFunction import *
 from myNLL import *
-from likelihood import *
 from gridworld import *
 from objectworld import *
 from linearvalueiteration import *
 from NNIRL import *
 import pprint
 from sampleexamples import *
-from lightning import *
+from train import *
 import numpy as np
 import pandas as pd
 import time
@@ -589,7 +585,7 @@ NLL.mdp_data = mdp_data
 
 
 configuration_dict = {'number_of_epochs': 200, 'base_lr': 0.1, 'i2': 30, 'h1_out': 15, 'h2_out': 6} #set config params for clearml
-mynet = NonLinearNet(len(feature_data['splittable']), configuration_dict.get('i2'), configuration_dict.get('h1_out'), configuration_dict.get('h2_out')) #config net
+mynet = None
 #print('\n using neural network with parameters: ', configuration_dict)
 
 trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R

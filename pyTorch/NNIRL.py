@@ -2,9 +2,6 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import softplus
 import torch.nn.functional as F
-from nonlinearBNN import *
-from nonlinearnn import *
-from linearnn import *
 import matplotlib.pyplot as plt
 import seaborn as sns
 from torch.autograd import gradcheck
@@ -16,7 +13,6 @@ import os
 import sys
 from NLLFunction import *
 from myNLL import *
-from likelihood import *
 from gridworld import *
 from objectworld import *
 from linearvalueiteration import *
