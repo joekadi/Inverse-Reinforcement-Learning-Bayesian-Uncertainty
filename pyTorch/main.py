@@ -509,7 +509,7 @@ final_figures = True
 NLL_EVD_plots = False 
 heatmapplots = False
 new_paths = True
-normalise = True
+normalise = False
 
 if new_paths:
     print('\n ... new paths will be sampled and dumped to NNIRL_param_list.pkl this run ...\n')

@@ -218,6 +218,7 @@ def objectworldfeatures(mdp_params, mdp_data):
     #Fill in the reward function.
     R_SCALE = 5
     #print('feature data', feature_data['splittable'][0,:])
+    
     r = cartaverage(mdp_params['r_tree'],feature_data)*R_SCALE
 
     return r, feature_data, true_feature_map

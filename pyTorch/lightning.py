@@ -132,7 +132,7 @@ if __name__ == "__main__":
         print('\n ... running on GridWorld benchmark ... \n')
 
     #Print true R loss 
-    print('\n ... true reward loss is', trueNLL ,'... \n')
+    print('\n ... true reward loss is', trueNLL.item() ,'... \n')
     
     # Initalise loss function
     NLL = NLLFunction()
@@ -159,6 +159,7 @@ if __name__ == "__main__":
         feature_data['splittable'][11,:] = torch.rand(feature_data['splittable'].shape[1])
         feature_data['splittable'][33,:] = torch.rand(feature_data['splittable'].shape[1])
         feature_data['splittable'][63,:] = torch.rand(feature_data['splittable'].shape[1])
+
 
     # Connect configuration dict
     configuration_dict = {'number_of_epochs': 2, 'base_lr': 0.05, 'p': 0.02, 'no_hidden_layers': 3, 'no_neurons_in_hidden_layers': len(feature_data['splittable'][0])*2 } #set config params for clearml
