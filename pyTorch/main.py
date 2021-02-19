@@ -494,11 +494,22 @@ class testers:
         # insert code to test how accurate BNN is i.e make predictions. last section of code from https://towardsdatascience.com/making-your-neural-network-say-i-dont-know-bayesian-nns-using-pyro-and-pytorch-b1c24e6ab8cd
 
 
+#Get which benchmark
 if len(sys.argv) > 1:
-    worldtype = str(sys.argv[1]) #benchmark type curr only gw or ow
+    worldtype = str(sys.argv[1]) #benchmark type from cmd line
     user_input = True
 else:
     user_input = False
+
+#Get number of paths
+if len(sys.argv) > 2:
+    N = int(str(sys.argv[2])) #number of sampled from cmd line
+else:
+    N = 32 #default value
+
+
+T = 16 #number of actions in each trajectory
+
 
 #set trigger params
 final_figures = True
@@ -513,8 +524,7 @@ else:
     print('\n ... loading paths and params from NNIRL_param_list.pkl ...\n')
 
 
-N = 32 #number of sampled trajectories
-T = 16 #number of actions in each trajectory
+
 
 # Generate mdp and R
 # Will always produce constant results due to constant random seed param

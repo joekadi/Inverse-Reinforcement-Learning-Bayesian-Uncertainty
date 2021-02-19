@@ -44,6 +44,9 @@ if __name__ == "__main__":
         index_states_to_remove = 0
         print('\n... got which noisey states from pre-defined variable ...\n')
 
+    if index_states_to_remove < 0 or index_states_to_remove > 2:
+        raise Exception("Index of states to remove from paths must be within range 0 - 2")
+
     # Load variables from main
     open_file = open("NNIRL_param_list.pkl", "rb")
     NNIRL_param_list = pickle.load(open_file)
@@ -77,7 +80,7 @@ if __name__ == "__main__":
         print('\n... evaluating on GridWorld benchmark ... \n')
 
     #Load model
-    irl_model = torch.load('./NP_models/NP_model_'+str(index_states_to_remove)+'.pth') 
+    irl_model = torch.load('./noisey_paths/models/' +str(len(example_samples))+ '_NP_model_'+str(index_states_to_remove)+'.pth') 
     
     num_preds = 1000 # Number of samples
 
@@ -117,15 +120,15 @@ if __name__ == "__main__":
     print('\n... saving results ...\n')
 
     # Create path for trained models
-    TRAINED_MODELS_PATH = "./NP_results/"
-    for path in [TRAINED_MODELS_PATH]:
+    RESULTS_PATH = "./noisey_paths/results/"
+    for path in [RESULTS_PATH]:
         try:
-            os.mkdir(path)
+            os.makedirs(path)
         except FileExistsError:
             pass
 
     NP_results = [y_mc_relu, y_mc_std_relu, y_mc_relu_reward, y_mc_relu_v, y_mc_relu_P, y_mc_relu_q]
-    file_name = './NP_results/results_'+str(index_states_to_remove)+'.pkl'
+    file_name = RESULTS_PATH + str(len(example_samples))+ '_results_'+str(index_states_to_remove)+'.pkl'
     open_file = open(file_name, "wb")
     pickle.dump(NP_results, open_file)
     open_file.close()

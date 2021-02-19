@@ -95,12 +95,14 @@ if __name__ == "__main__":
         index_states_to_remove = 0
         print('\n... got which noisey states from pre-defined variable ...\n')
 
-    
+    if index_states_to_remove < 0 or index_states_to_remove > 2:
+        raise Exception("Index of states to remove from paths must be within range 0 - 2")
+
     states_to_remove = [np.arange(0, 32, 1), np.arange(0, 64, 1), np.arange(0, 128, 1)]
     num_preds = 1000 # Number of samples
 
     # Initalise task on clearML
-    task = Task.init(project_name='MSci-Project', task_name='Train - Noisey paths for states 1-128')
+    task = Task.init(project_name='MSci-Project', task_name='Train - Noisey paths')
     
     # Load variables
     open_file = open("NNIRL_param_list.pkl", "rb")
@@ -193,14 +195,14 @@ if __name__ == "__main__":
     print('\n... Finished training models ...\n')
     
     # Create path for trained models
-    TRAINED_MODELS_PATH = "./NP_models/"
+    TRAINED_MODELS_PATH = "./noisey_paths/models/"
     for path in [TRAINED_MODELS_PATH]:
         try:
-            os.mkdir(path)
+            os.makedirs(path)
         except FileExistsError:
             pass
 
     # Save model and new features
-    torch.save(model.model, TRAINED_MODELS_PATH + 'NP_model_'+str(index_states_to_remove)+'.pth') 
+    torch.save(model.model, TRAINED_MODELS_PATH + str(len(example_samples))+'_NP_model_'+str(index_states_to_remove)+'.pth') 
     tensorboard_writer.close()
     
