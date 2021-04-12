@@ -12,6 +12,14 @@ To create conda virtualenv from requirements:
 
 # Running Instructions
 
+All objectworld params customisable in objectworld.create_objectworld(). Default params:
+
+`mdp_params = {'n': 16, 'placement_prob': 0.05, 'c1': 2.0, 'c2': 2.0, 'continuous': False, 'determinism': 1.0, 'discount': 0.9, 'seed': 0, 'r_tree': None}`
+  
+All gridworld params customisable in gridworld.create_gridworld(). Default params:
+
+`mdp_params = {'n': 8, 'b': 1, 'determinism': 1.0, 'discount': 0.99, 'seed': 0}`  
+  
 To initialise benchmark (objectworld or gridworld):
 
 `$ python initialise_problem.py <worldtype> <number_of_paths>`
