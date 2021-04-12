@@ -975,7 +975,6 @@ total_dropout_avg_policy = sum(total_dropout_policies_per_paths)/len(total_dropo
 total_swag_avg_uncertainty = scaler.fit_transform(sum(total_swag_uncertainties_per_paths)/len(total_swag_uncertainties_per_paths))
 total_gp_avg_uncertainty = scaler.fit_transform(sum(total_gp_uncertainties_per_paths)/len(total_gp_uncertainties_per_paths))
 total_ensembles_avg_uncertainty = sum(total_ensembles_uncertainties_per_paths)/len(total_ensembles_uncertainties_per_paths)
-total_ensembles_avg_uncertainty[total_ensembles_avg_uncertainty == float("Inf")  ] = 0.9e100
 total_ensembles_avg_uncertainty = scaler.fit_transform(total_ensembles_avg_uncertainty)
 total_dropout_avg_uncertainty = scaler.fit_transform(sum(total_dropout_uncertainties_per_paths)/len(total_dropout_uncertainties_per_paths))
 
@@ -1008,7 +1007,7 @@ fig.savefig(NP_GRAPHS_PATH + "mcdropout_ence.png")
 
 
 #Plot swag ence
-fig, ax = plot__ence(mdp_solution['p'].squeeze(), np_swag_avg_policy, np_swag_avg_uncertainty)
+fig, ax = plot_ence(mdp_solution['p'].squeeze(), np_swag_avg_policy, np_swag_avg_uncertainty)
 textstr = 'ENCE = ' + str(round(np_swag_ence,4))
 props = dict(boxstyle='round', facecolor='white', alpha=0.75)
 ax.text(0.62, 0.94,textstr, transform=ax.transAxes, fontsize=6,
@@ -1084,7 +1083,7 @@ fig.savefig(NF_GRAPHS_PATH + "mcdropout_ence.png")
 
 
 #Plot swag ence
-fig, ax = plot__ence(mdp_solution['p'].squeeze(), nf_swag_avg_policy, nf_swag_avg_uncertainty)
+fig, ax = plot_ence(mdp_solution['p'].squeeze(), nf_swag_avg_policy, nf_swag_avg_uncertainty)
 
 textstr = 'ENCE = ' + str(round(nf_swag_ence,4))
 
@@ -1162,7 +1161,7 @@ fig.savefig(TOTAL_GRAPHS_PATH + "mcdropout_ence.png")
 
 
 #Plot swag ence
-fig, ax = plot__ence(mdp_solution['p'].squeeze(), total_swag_avg_policy, total_swag_avg_uncertainty)
+fig, ax = plot_ence(mdp_solution['p'].squeeze(), total_swag_avg_policy, total_swag_avg_uncertainty)
 textstr = 'ENCE = ' + str(round(total_swag_ence,4))
 props = dict(boxstyle='round', facecolor='white', alpha=0.75)
 ax.text(0.62, 0.94,textstr, transform=ax.transAxes, fontsize=6,
@@ -1237,7 +1236,7 @@ fig.savefig(NF_GRAPHS_PATH + "mcdropout_cc.png")
 
 
 #SWAG
-fig, ax, nf_swag_CAE = calibration__curve(mdp_solution['p'], nf_swag_avg_policy, nf_swag_avg_uncertainty) 
+fig, ax, nf_swag_CAE = calibration_curve(mdp_solution['p'], nf_swag_avg_policy, nf_swag_avg_uncertainty) 
 textstr = 'ENEE = ' + str(round(nf_swag_CAE,4))
 props = dict(boxstyle='round', facecolor='white', alpha=0.75)
 ax.text(0.62, 0.94,textstr, transform=ax.transAxes, fontsize=6,
@@ -1277,7 +1276,7 @@ fig.savefig(NP_GRAPHS_PATH + "mcdropout_cc.png")
 
 
 #SWAG
-fig, ax, np_swag_CAE = calibration__curve(mdp_solution['p'], np_swag_avg_policy, np_swag_avg_uncertainty)
+fig, ax, np_swag_CAE = calibration_curve(mdp_solution['p'], np_swag_avg_policy, np_swag_avg_uncertainty)
 textstr = 'ENEE = ' + str(round(np_swag_CAE,4))
 props = dict(boxstyle='round', facecolor='white', alpha=0.75)
 ax.text(0.62, 0.94,textstr, transform=ax.transAxes, fontsize=6,
@@ -1336,7 +1335,7 @@ ax.text(0.96, 0.127,textstr, transform=ax.transAxes, fontsize=6,
 fig.savefig(TOTAL_GRAPHS_PATH + "mcdropout_cc.png")
 
 #SWAG
-fig, ax, total_swag_CAE = calibration__curve(mdp_solution['p'], total_swag_avg_policy, total_swag_avg_uncertainty)
+fig, ax, total_swag_CAE = calibration_curve(mdp_solution['p'], total_swag_avg_policy, total_swag_avg_uncertainty)
 textstr = 'ENEE = ' + str(round(total_swag_CAE,4))
 props = dict(boxstyle='round', facecolor='white', alpha=0.75)
 ax.text(0.62, 0.94,textstr, transform=ax.transAxes, fontsize=6,
