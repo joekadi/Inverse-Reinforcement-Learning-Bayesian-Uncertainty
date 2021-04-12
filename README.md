@@ -90,11 +90,12 @@ All result figures PNG's and CSVs can be seen in "pyTorch/results/regular"
 ## Analysing and visualising uncertainty calibrations:
 
 `$ cd "/pyTorch/results"`
+
 `$ python uncertainty_visualise.py`
 
 All result figures PNG's and CSVs can be seen in "pyTorch/results/"
 
-All final figures used in the report can be seen in 
+All final figures used in the report can be seen in "./final_figures/"
 
 
 
