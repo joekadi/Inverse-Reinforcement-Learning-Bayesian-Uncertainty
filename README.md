@@ -82,9 +82,10 @@ Configure hyper parameter search  in pyTorch/train_models/hyperparamsearch.py th
 ## Analysing and visualising IRL performance:
 
 `$ cd "/pyTorch/results"`
+
 `$ python irl_visualise.py`
 
-All result figures PNG's and CSVs can be seen in "pyTorch/results/regular"
+All result figures PNG's and CSVs can be seen in "pyTorch/results/regular/"
 
 
 ## Analysing and visualising uncertainty calibrations:
@@ -93,7 +94,7 @@ All result figures PNG's and CSVs can be seen in "pyTorch/results/regular"
 
 `$ python uncertainty_visualise.py`
 
-All result figures PNG's and CSVs can be seen in "pyTorch/results/"
+All result figures PNG's and CSVs can be seen in "pyTorch/results/$TYPE_OF_NOISE$"
 
 All final figures used in the report can be seen in "./final_figures/"
 
