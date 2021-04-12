@@ -18,15 +18,14 @@ from torch.utils.data import random_split
 from scipy.optimize import minimize, check_grad
 import os
 import sys
-from NLLFunction import *
-from myNLL import *
-from gridworld import *
-from objectworld import *
-from linearvalueiteration import *
-from NNIRL import *
+sys.path[0] = "/Users/joekadi/Documents/University/5thYear/Thesis/Code/MSci-Project/pyTorch/"
+from maxent_irl.obj_functions.NLLFunction import *
+from maxent_irl.obj_functions.NLLModel import *
+from benchmarks.gridworld import *
+from benchmarks.objectworld import *
+from maxent_irl.linearvalueiteration import *
 import pprint
-from sampleexamples import *
-from train import *
+from maxent_irl.sampleexamples import *
 import numpy as np
 import pandas as pd
 import time
@@ -40,6 +39,8 @@ from clearml.automation import HyperParameterOptimizer
 from clearml.automation.optuna import OptimizerOptuna
 from torch.utils.tensorboard import SummaryWriter
 import pickle
+from maxent_irl.obj_functions import NLLFunction
+from maxent_irl.obj_functions.NLLFunction import NLLFunction
 
 tensorboard_writer = SummaryWriter('./tensorboard_logs')
 print('\n\ntorch version:', torch.__version__)
@@ -499,12 +500,14 @@ if len(sys.argv) > 1:
     worldtype = str(sys.argv[1]) #benchmark type from cmd line
     user_input = True
 else:
+    raise Exception('No benchmark provided. Currently supports Objectworld (obj, ow) or Gridworld (grid, gw)')
     user_input = False
 
 #Get number of paths
 if len(sys.argv) > 2:
     N = int(str(sys.argv[2])) #number of sampled from cmd line
 else:
+    raise Exception('Number of paths not supplied')
     N = 32 #default value
 
 
@@ -515,7 +518,12 @@ T = 16 #number of actions in each trajectory
 final_figures = True
 NLL_EVD_plots = False 
 heatmapplots = False
-new_paths = True
+if N:
+    new_paths = True
+else:
+    new_paths = False
+
+
 normalise = False
 
 if new_paths:
@@ -524,7 +532,6 @@ else:
     print('\n... loading paths and params from NNIRL_param_list.pkl ...\n')
 
 # Generate mdp and R
-# Will always produce constant results due to constant random seed param
 if(user_input):
     if worldtype == "gridworld" or worldtype == "gw" or worldtype == "grid":
         print('\n... Creating GridWorld ...\n')
@@ -604,7 +611,8 @@ if new_paths:
     print('\n... Saving new variables ...\n')
     #save params for NNIRL to file
     NNIRL_param_list = [0.01, "Adam", mynet, initD, mu_sa, muE, mdp_data, truep, NLL_EVD_plots, example_samples, mdp_params, r, mdp_solution, feature_data, trueNLL, normalise, user_input, worldtype]
-    file_name = "NNIRL_param_list.pkl"
+    PARAM_PATH = "./param_list/"
+    file_name = PARAM_PATH + str(N) + "_NNIRL_param_list.pkl"
     open_file = open(file_name, "wb")
     pickle.dump(NNIRL_param_list, open_file)
     open_file.close()
@@ -625,335 +633,3 @@ print('No states from paths between 1-128: ', num_first_half_states)
 print('No states from paths between 128-256: ', num_second_half_states)
 print('Percent of states from paths between 1-128: ', (num_first_half_states/num_moves)*100)
 print('Percent of states from paths between 128-256: ', (num_second_half_states/num_moves)*100)
-
-
-
-'''
-# run NN ensemble
-models_to_train = 10  # train this many models
-max_epochs = 3      # for this many epochs
-iters_per_epoch = 50
-learning_rate = 0.1
-models, model_weights =  run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate, feature_data['splittable'])
-
-#get ensemble model predictions
-ensemble_models = []
-for _, row in model_weights.iterrows():
-    # Compute test prediction for this iteration of ensemble weights
-    tmp_y_hat = np.array(
-        [models[model_name] * weight
-            for model_name, weight in row.items()]
-    ).sum(axis=0)
-    ensemble_models.append(tmp_y_hat)
-ensemble_models = pd.Series(ensemble_models)
-
-
-print('for model in ensemble models line')
-for model in ensemble_models:
-    print(model)
-
-
-#print metrics for true R 
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}".format(r[:, 0], trueNLL, optimal_policy))  # Printline if LH is scalar
-
-#calculate metrics for final R from ensemble
-v, q, logp, ensemblep = linearvalueiteration(mdp_data, ensemble_models.iloc[-1].view(4, 1))
-ensembleoptimal_policy = np.argmax(ensemblep.detach().cpu().numpy(), axis=1)
-
-#print metrics for final R from ensemble
-print('\nFinal Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(ensemble_models.iloc[-1], ensembleoptimal_policy, NLL.calculate_EVD(truep, torch.matmul(X, ensemble_models.iloc[-1])), NLL.apply(ensemble_models.iloc[-1], initD, mu_sa, muE, F, mdp_data)))
-
-#stack all predicted rewards
-predictions = torch.empty(len(ensemble_models), mdp_params['n']**2)
-i = 0
-for predictedR in ensemble_models:
-    predictions[i] = predictedR
-    i += 1
-
-#get average predicted reward and uncertainty of all models
-average_predictions = torch.empty(mdp_params['n']**2)
-predictions_uncertainty = torch.empty(mdp_params['n']**2)
-for column in range(predictions.size()[1]):
-    average_predictions[column] = torch.mean(predictions[:, column]) #save avg predicted R for each state
-    predictions_uncertainty[column] = torch.var(predictions[:, column]) #save variance for each states prediciton as uncertainty
-
-#calculate metrics for avg R from ensemble
-v, q, logp, avgensemblep = linearvalueiteration(mdp_data, average_predictions.view(4, 1))
-avgensembleoptimal_policy = np.argmax(avgensemblep.detach().cpu().numpy(), axis=1)
-print('\nAverage Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(average_predictions, avgensembleoptimal_policy, NLL.calculate_EVD(truep, torch.matmul(X, average_predictions)), NLL.apply(average_predictions, initD, mu_sa, muE, F, mdp_data)))
-print('\nPredictions Uncertainty {}'.format(predictions_uncertainty))
-
-
-#plot uncertainty
-x = [1,2,3,4]
-y = ensemble_models.iloc[-1].detach().numpy()
-yerr = predictions_uncertainty.detach().numpy()
-fig, ax = plt.subplots()
-ax.errorbar(x, y,
-            yerr=yerr,
-            fmt='o')
-ax.set_xlabel('State')
-ax.set_ylabel('Predicted R')
-ax.set_title('Predicted R w/ Error Bars')
-plt.show()
-
-
-
-
-'''
-
-
-
-
-
-"""
-# set true R equal matlab impl w/ random seed 0
-# not a reward func ... a look up table
-r = torch.Tensor(np.array(
-    [
-        [3., 3., 3., 3., 3.],
-        [6., 6., 6., 6., 6.],
-        [5., 5., 5., 5., 5.],
-        [2., 2., 2., 2., 2.]
-    ], dtype=np.float64))
-
-
-# Solve MDP
-v, q, logp, truep = linearvalueiteration(mdp_data, r)
-mdp_solution = {'v': v, 'q': q, 'p': truep, 'logp': logp}
-optimal_policy = np.argmax(truep.detach().cpu().numpy(), axis=1)
-
-# Sample paths
-print("\n... sampling paths from true R ... \n")
-example_samples = sampleexamples(N, T, mdp_solution, mdp_data)
-print("... done ...\n")
-
-NLL = NLLFunction()  # initialise NLL
-initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(
-    mdp_data, N, T, example_samples)  # calculate required variables
-
-# assign constant class variable
-NLL.F = F
-NLL.muE = muE
-NLL.mu_sa = mu_sa
-NLL.initD = initD
-NLL.mdp_data = mdp_data
-
-trueNLL = NLL.apply(r, initD, mu_sa, muE, F, mdp_data)  # NLL for true R
-
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r[:, 0], trueNLL, optimal_policy))  # Printline if LH is scalar
-
-"""
-
-# run single NN
-"""
-mynet = NonLinearNet()
-single_net = run_single_NN(0.003, "Adam", mynet)
-"""
-
-'''
-# run NN ensemble
-models_to_train = 10  # train this many models
-max_epochs = 3       # for this many epochs
-iters_per_epoch = 50
-learning_rate = 0.1
-models, model_weights =  run_NN_ensemble(models_to_train, max_epochs, iters_per_epoch, learning_rate)
-
-#get ensemble model predictions
-ensemble_models = []
-for _, row in model_weights.iterrows():
-    # Compute test prediction for this iteration of ensemble weights
-    tmp_y_hat = np.array(
-        [models[model_name] * weight
-            for model_name, weight in row.items()]
-    ).sum(axis=0)
-    ensemble_models.append(tmp_y_hat)
-ensemble_models = pd.Series(ensemble_models)
-
-
-print('for model in ensemble models line')
-for model in ensemble_models:
-    print(model)
-
-
-#print metrics for true R 
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}".format(r[:, 0], trueNLL, optimal_policy))  # Printline if LH is scalar
-
-#calculate metrics for final R from ensemble
-v, q, logp, ensemblep = linearvalueiteration(mdp_data, ensemble_models.iloc[-1].view(4, 1))
-ensembleoptimal_policy = np.argmax(ensemblep.detach().cpu().numpy(), axis=1)
-
-#print metrics for final R from ensemble
-print('\nFinal Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(ensemble_models.iloc[-1], ensembleoptimal_policy, NLL.calculate_EVD(truep, ensemble_models.iloc[-1]), NLL.apply(ensemble_models.iloc[-1], initD, mu_sa, muE, F, mdp_data)))
-
-#stack all predicted rewards
-predictions = torch.empty(len(ensemble_models), mdp_params['n']**2)
-i = 0
-for predictedR in ensemble_models:
-    predictions[i] = predictedR
-    i += 1
-
-#get average predicted reward and uncertainty of all models
-average_predictions = torch.empty(mdp_params['n']**2)
-predictions_uncertainty = torch.empty(mdp_params['n']**2)
-for column in range(predictions.size()[1]):
-    average_predictions[column] = torch.mean(predictions[:, column]) #save avg predicted R for each state
-    predictions_uncertainty[column] = torch.var(predictions[:, column]) #save variance for each states prediciton as uncertainty
-
-#calculate metrics for avg R from ensemble
-v, q, logp, avgensemblep = linearvalueiteration(mdp_data, average_predictions.view(4, 1))
-avgensembleoptimal_policy = np.argmax(avgensemblep.detach().cpu().numpy(), axis=1)
-print('\nAverage Estimated R from ensemble NN: \n{}\n - with optimal policy {}\n - EVD of {}\n - negated likelihood: {}'.format(average_predictions, avgensembleoptimal_policy, NLL.calculate_EVD(truep, average_predictions), NLL.apply(average_predictions, initD, mu_sa, muE, F, mdp_data)))
-print('\nPredictions Uncertainty {}'.format(predictions_uncertainty))
-
-
-#plot uncertainty
-x = [1,2,3,4]
-y = ensemble_models.iloc[-1].detach().numpy()
-yerr = predictions_uncertainty.detach().numpy()
-fig, ax = plt.subplots()
-ax.errorbar(x, y,
-            yerr=yerr,
-            fmt='o')
-ax.set_xlabel('State')
-ax.set_ylabel('Predicted R')
-ax.set_title('Predicted R w/ Error Bars')
-plt.show()
-
-
-
-'''
-
-
-
-
-
-
-
-# variation weights BNN
-'''
-X = torch.Tensor([[0],
-				[1],
-				[2],
-				[3]]) #1 feature to work with nonLinearBNN config 
-net = NonLinearBNN() #maps 1 input feature to 1 output to comply with pyro.svi expectations
-variationalweightsBNN(r, X, net)
-'''
-
-'''
-minimise = minimise()
-mynet = NonLinearNet()
-preds = getNNpreds(minimise = minimise, mynet = mynet, num_nets = 10)
-
-
-
-#for testing to avoid running getNNpreds
-preds = torch.Tensor(np.array(
-	[
-		[-2.316e+77, 2.687e+154,  3.000e+00,  3.000e+00],
-        [ 3.000e+00,  6.000e+00,  6.000e+00,  6.000e+00],
-        [ 6.000e+00,  6.000e+00,  5.000e+00,  5.000e+00],
-        [ 5.000e+00,  5.000e+00,  5.000e+00,  2.000e+00],
-        [ 2.000e+00,  2.000e+00,  2.000e+00,  2.000e+00]
-	], dtype=np.float64))
-
-
-
-
-
-
-#get each states reward predictions
-state0preds = preds[:, 0]
-state1preds = preds[:, 1]
-state2preds = preds[:, 2]
-state3preds = preds[:, 3]
-predictedRewards = torch.empty(4, dtype=torch.float64)
-predictedRewards[0] = torch.mean(state0preds)
-predictedRewards[1] = torch.mean(state1preds)
-predictedRewards[2] = torch.mean(state2preds)
-predictedRewards[3] = torch.mean(state3preds)
-rewardUncertanties = torch.empty(4)
-rewardUncertanties[0] = torch.var(state0preds)
-rewardUncertanties[1] = torch.var(state1preds)
-rewardUncertanties[2] = torch.var(state2preds)
-rewardUncertanties[3] = torch.var(state3preds)
-
-
-#print("\nTrue R is \n{}\n with negated tensor likelihood of \n{}\n total: {}\n and optimal policy: {}\n".format(r, trueNLL.view(4).detach().numpy(), sum(trueNLL).detach().numpy(), optimal_policy)) #Printline if LH is tensor
-print("\nTrue R: {}\n - negated likelihood: {}\n - optimal policy: {}\n".format(r[:, 0], trueNLL, optimal_policy)) #Printline if LH is scalar
-print('NN predicted state 0 has R of {} with an uncertainty of {}'.format(torch.mean(state0preds), torch.var(state0preds)))
-print('NN predicted state 1 has R of {} with an uncertainty of {}'.format(torch.mean(state1preds), torch.var(state1preds)))
-print('NN predicted state 2 has R of {} with an uncertainty of {}'.format(torch.mean(state2preds), torch.var(state2preds)))
-print('NN predicted state 3 has R of {} with an uncertainty of {}'.format(torch.mean(state3preds), torch.var(state3preds)))
-
-#calculate metrics for printing
-v, q, logp, thisp = linearvalueiteration(mdp_data, predictedRewards.view(4,1)) #to get policy under out R
-thisoptimal_policy = np.argmax(thisp.detach().cpu().numpy(), axis=1) 
-estNLL = NLL.apply(predictedRewards,initD, mu_sa, muE, F, mdp_data) #NLL for true R
-
-print('\nNN Estimated R: {}\n- negated likelihood: {}\n- optimal policy {}'.format(predictedRewards, estNLL, thisoptimal_policy))
-
-'''
-
-
-# plot predicted reward w/ uncertainties
-'''
-f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
-ax1.plot(r[:,0].view(4), np.linspace(-10,10,4), xerr=rewardUncertanties, fmt='o', color='black', ecolor='lightgray', elinewidth=3, capsize=0)
-ax1.set_title('True R')
-ax2.errorbar(predictedRewards, np.linspace(-10,10,4), xerr=rewardUncertanties, fmt='o', color='black', ecolor='lightgray', elinewidth=3, capsize=0)
-ax2.set_title('Predicted Rewards')
-plt.errorbar(np.linspace(-10,10,4), predictedRewards, xerr=0.2, yerr=0.4, fmt='o', color='black', ecolor='lightgray', elinewidth=3, capsize=0)
-plt.show()
-'''
-
-"""
-# playground from here 
-# -------------------------------
-
-[states,actions,transitions] = mdp_data['sa_p'].size()
-D = torch.zeros(states,1)
-diff = 1.0
-threshold = 0.00001
-features = F.shape[2-1]
-r = torch.rand(features,1)
-for j in range(1):
-    # Dp = torch.tensor(D.clone().detach().requires_grad_(True), dtype=torch.float64)
-    Dp = D
-    #left_hold = torch.tensor(np.tile(p[...,None], (1,1,transitions)))
-    #LHS = torch.mul(left_hold, mdp_data['sa_p'])
-    #RHS = torch.tensor(np.tile(Dp[...,None], (1,actions,transitions)))
-    #RHS = RHS0*mdp_data['discount']
-
-  
-    Dpi = torch.mul(torch.mul(torch.tensor(np.tile(mdp_solution['p'][...,None], (1,1,transitions))), mdp_data['sa_p'].type('torch.DoubleTensor')), torch.tensor(np.tile(Dp[...,None], (1,actions,transitions)))*mdp_data['discount'])
-    
-    '''
-    print(Dpi.size())
-    print('sa_p\n', Dpi[:,:,0])
-    print('sa_p\n', Dpi[:,:,1])
-    print('sa_p\n', Dpi[:,:,2])
-    print('sa_p\n', Dpi[:,:,3])
-    print('sa_p\n', Dpi[:,:,4])
-    '''
-
-    D_CSR = sps.csc_matrix((Dpi.transpose(1,0).flatten(), mdp_data['sa_s'].transpose(1,0).flatten().type('torch.DoubleTensor'), torch.arange(states*actions*transitions+1)), shape=(states,states*actions*transitions)) 
-    D_CSR.eliminate_zeros()    
-    D_mx = torch.tensor(D_CSR.todense()) @ torch.ones(states*actions*transitions,1)
-    D_s = torch.sum(D_mx,1)
-    D_s = D_s.view(len(D_s), 1)
-    D = initD + D_s
-
-    print(D)
-    
-    diff = torch.max(torch.abs(torch.subtract(D,Dp)))
-
-
-'''
-print('sa_p\n', mdp_data['sa_s'][:,:,0])
-print('sa_p\n', mdp_data['sa_s'][:,:,1])
-print('sa_p\n', mdp_data['sa_s'][:,:,2])
-print('sa_p\n', mdp_data['sa_s'][:,:,3])
-print('sa_p\n', mdp_data['sa_s'][:,:,4])
-'''
-"""
