@@ -10,7 +10,7 @@ This will ensure all relative and absolute imports find correc paths
 
 To create conda virtualenv from requirements:
 
-$ conda create --name <env> --file requirements.txt
+`$ conda create --name <env> --file requirements.txt`
 
 ### Running
 
