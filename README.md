@@ -77,8 +77,6 @@ Configure hyper parameter search  in pyTorch/train_models/hyperparamsearch.py th
 `$ cd "pyTorch/train_models/"`
 `$ python hyperparamsearch.py <TASK_ID>`
 
-# Analysing & Visualising Results
-
 ## Analysing and visualising IRL performance:
 
 `$ cd "/pyTorch/results"`
@@ -96,10 +94,4 @@ All result figures PNG's and CSVs can be seen in "pyTorch/results/regular/"
 
 All result figures PNG's and CSVs can be seen in "pyTorch/results/$TYPE_OF_NOISE$"
 
-All final figures used in the report can be seen in "./final_figures/"
-
-
-
-
-
-
+All figures used in the final report can be seen in "./final_figures/"
