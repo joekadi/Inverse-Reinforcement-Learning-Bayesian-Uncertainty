@@ -8,7 +8,12 @@ This is part of my Computing Science Level 5 MSci Project @ Glasgow University w
 In every overwrite change sys.path[0] = "/Users/MSci-Project/pyTorch/" to path of cloned directory
 This will ensure all relative and absolute imports find correc paths
 
+To create conda virtualenv from requirements:
+
+$ conda create --name <env> --file requirements.txt
 
 ### Running
+
+$ python 
 
 
