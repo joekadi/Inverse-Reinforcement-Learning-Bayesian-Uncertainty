@@ -95,12 +95,19 @@ if __name__ == "__main__":
         index_features_to_corrupt = 0
         print('\n... got which noisey features from pre-defined variable ...\n')
 
+    if len(sys.argv) > 2:
+        dropout_val = float(str(sys.argv[2]))
+        print('\n... got dropout value from cmd line ...\n')
+    else:
+        dropout_val = 0.2
+        print('\n... got dropout value from pre-defined variable ...\n')
+
     if index_features_to_corrupt < 0 or index_features_to_corrupt > 3:
         raise Exception("Index of features to corrupt must be within range 0 - 3")
 
 
     # Initalise task on clearML
-    task = Task.init(project_name='MSci-Project', task_name='Train - Noisey features')
+    #task = Task.init(project_name='MSci-Project', task_name='Train - Noisey features')
     
     # Load variables
     open_file = open("NNIRL_param_list.pkl", "rb")
@@ -154,7 +161,7 @@ if __name__ == "__main__":
         feature_data['splittable'][:,i] = torch.rand(feature_data['splittable'].shape[0])
     
     # Create path to save noisey features
-    NOISEY_FEATURES_PATH = "./noisey_features/paths/"
+    NOISEY_FEATURES_PATH = "./noisey_features/featuredata/"
     for path in [NOISEY_FEATURES_PATH]:
         try:
             os.makedirs(path)
@@ -162,15 +169,15 @@ if __name__ == "__main__":
             pass
     
     # Save noisey features for eval
-    file_name = NOISEY_FEATURES_PATH+str(len(example_samples))+"_feature_data_"+str(index_features_to_corrupt)+".pkl"
+    file_name = NOISEY_FEATURES_PATH+str(worldtype)+'_'+str(dropout_val)+'_'+str(len(example_samples))+"_feature_data_"+str(index_features_to_corrupt)+".pkl"
     open_file = open(file_name, "wb")
     pickle.dump(feature_data, open_file)
     open_file.close()
 
 
     # Connect configuration dict
-    configuration_dict = {'number_of_epochs': 1, 'base_lr': 0.05, 'p': 0.02, 'no_hidden_layers': 3, 'no_neurons_in_hidden_layers': len(feature_data['splittable'][0])*2 } #set config params for clearml
-    configuration_dict = task.connect(configuration_dict)
+    configuration_dict = {'number_of_epochs': 1, 'base_lr': 0.05, 'p': dropout_val, 'no_hidden_layers': 3, 'no_neurons_in_hidden_layers': len(feature_data['splittable'][0])*2 } #set config params for clearml
+    #configuration_dict = task.connect(configuration_dict)
 
     # Assign loss function constants
     NLL.F = feature_data['splittable']
@@ -215,6 +222,6 @@ if __name__ == "__main__":
             pass
 
     # Save model and new features
-    torch.save(model.model, TRAINED_MODELS_PATH + str(len(example_samples))+ '_NF_model_'+str(index_features_to_corrupt)+'.pth') 
+    torch.save(model.model, TRAINED_MODELS_PATH+str(worldtype)+'_'+str(dropout_val)+'_'+ str(len(example_samples))+ '_NF_model_'+str(index_features_to_corrupt)+'.pth') 
     tensorboard_writer.close()
     

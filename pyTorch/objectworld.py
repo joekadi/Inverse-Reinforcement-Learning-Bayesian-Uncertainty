@@ -3,6 +3,8 @@ import numpy as np
 import math as math
 import random
 from scipy import sparse as sps
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 from gridworld import *
 
 torch.set_printoptions(precision=5)
@@ -294,28 +296,33 @@ def owVisualise(test_result):
     g = torch.ones(int(test_result['mdp_data']['states']),1)*0.5+Eo*0.5
 
     #Create figure.
-    f, (ax1, ax2, ax3) = plt.subplots(1, 3, sharex=True)
+    #if test_result['irl_result']['uncertainty']:
+        #f, (ax1, ax2, ax3) = plt.subplots(1, 3, sharex=True)
+    #else:
+    f, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
         
     #Draw reward for ground truth.
     objectworlddraw(test_result['true_r'],test_result['mdp_solution']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax1)
 
     # Draw reward for IRL result.
     objectworlddraw(test_result['irl_result']['r'],test_result['irl_result']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax2)
-    
-    # Draw uncertainty for IRL result
-    objectworlddraw(test_result['irl_result']['uncertainty'],test_result['irl_result']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax3)
-
+    '''
+    if test_result['irl_result']['uncertainty']:
+        # Draw uncertainty for IRL result
+        objectworlddraw(test_result['irl_result']['uncertainty'],test_result['irl_result']['p'],g,test_result['mdp_params'],test_result['mdp_data'], f, ax3)
+        ax3.set_title(test_result['irl_result']['uncertainty_figure_title'])
+    '''
     ax1.set_title(test_result['irl_result']['truth_figure_title'])
     ax2.set_title(test_result['irl_result']['pred_reward_figure_title'])
-    ax3.set_title(test_result['irl_result']['uncertainty_figure_title'])
-
-    plt.show()
+   
+    return f
 
 def objectworlddraw(r,p,g,mdp_params, mdp_data, f, ax):
 
     #Use gridworld drawing function to draw paths and reward function
     gridworlddraw(r,p,g,mdp_params, mdp_data, f, ax)
 
+    
     #Initialize colors.
     shapeColours = plt.cm.jet( np.linspace(0,1, int(mdp_params['c1']+mdp_params['c2']))   )    
 
@@ -348,3 +355,4 @@ def objectworlddraw(r,p,g,mdp_params, mdp_data, f, ax):
             #Draw the object
             circle = patches.FancyBboxPatch(xy = (x-0.55,y-0.55),width=0.000000008,height=0.000000008, boxstyle='circle', facecolor=shapeColours[int(mdp_params['c1']+c2),:], edgecolor=shapeColours[int(c1),:], linewidth=2.0) #create rectangle patches
             ax.add_patch(circle) # Add the patch to the Axes
+    

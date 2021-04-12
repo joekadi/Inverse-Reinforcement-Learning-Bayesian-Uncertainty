@@ -6,6 +6,7 @@ import torch
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
+from utils import *
 torch.set_printoptions(precision=3)
 
 class Likelihood():
@@ -168,6 +169,4 @@ class Likelihood():
         #Calculate likelihood from logp
         likelihood = sum(sum(logp*self.mu_sa))
         return -likelihood, -dr.detach().cpu().numpy()
-
-
 

@@ -172,7 +172,8 @@ def gridworlddraw(r,p,g,mdp_params, mdp_data, f, ax):
             rect = patches.Rectangle(xy = (x-crop[1,1],y-crop[2,1]),width=1,height=1,facecolor=colour[0]) #create rectangle patches
             ax.add_patch(rect) # Add the patch to the Axes
     '''
-
+    
+    
     if isinstance(g, list):
         print('g contains example traces - just draw those.')
         print('needs implementeed')
@@ -189,7 +190,8 @@ def gridworlddraw(r,p,g,mdp_params, mdp_data, f, ax):
                 s = ((y-1)*n+x)-1
                 a = p[s].item()
                 gridworlddrawagent(x,y,a,np.array([g[s].item(),g[s].item(),g[s].item()]), f, ax)
-        
+    
+
 def gridworlddrawagent(x,y,a,colour,f,ax):
     overlap = 0
     w = 1+(overlap)*0.5
@@ -226,3 +228,48 @@ def create_gridworld():
     mdp_data, r, feature_data = gridworldbuild(mdp_params)
     print("\n... done ...")
     return mdp_data, r, feature_data, mdp_params
+
+def gridworlddrawuncertainty(r,p,g,mdp_params, mdp_data, f, ax):
+
+    #Set up the axes.
+    n = mdp_params['n']
+
+    maxr = torch.max(torch.max(r))
+    minr = torch.min(torch.min(r))
+    rngr = maxr-minr
+    rngr = rngr.item()
+
+    if isinstance(g, list):
+        crop = p
+    else:
+        crop = np.array([[1, n], [1,n]])
+
+    ax.set_xlim(0, crop[0,1]-crop[0,0]+1)
+    ax.set_ylim(0, crop[1,1]-crop[1,0]+1)
+
+    if isinstance(g, list):
+        ax.set_xticks([])
+        ax.set_yticks([])
+    else:
+        ax.set_xticks(np.arange(0, crop[0,1]-crop[0,0]+2))
+        ax.set_yticks(np.arange(0, crop[1,1]-crop[1,0]+2))
+
+    #daspect[1 1 1]
+    
+    #Draw the reward function
+    for y in range(crop[1,0], crop[1,1]+1):
+        for x in range(crop[0,0]-1, crop[0,1]):
+            #print('xy', (x-crop[0,0]+1,y-crop[1,0]))
+            if rngr == 0:
+                v = 0.0
+            else:
+                v = (torch.mean( r[(y-1)*n+x,:])-minr)/rngr
+                v = v.item()
+            colour = np.array([v,v,v])            
+            colour = np.minimum( np.ones((1,3))   ,  np.maximum(np.zeros((1,3)) , colour))
+            
+            
+            rect = patches.Rectangle(xy = (x-crop[0,0]+1,y-crop[1,0]),width=1,height=1,facecolor=colour[0]) #create rectangle patches
+            ax.add_patch(rect) # Add the patch to the Axes
+    
+

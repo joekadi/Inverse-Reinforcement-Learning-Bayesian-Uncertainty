@@ -122,6 +122,7 @@ class NLLFunction(torch.autograd.Function):
         #Returns NLL w.r.t input r
 
         ctx.save_for_backward(r, initD, mu_sa, muE, F, mdp_data['sa_p'], mdp_data['sa_s'], torch.tensor(mdp_data['states']), torch.tensor(mdp_data['actions']), torch.tensor(mdp_data['discount']), torch.tensor(mdp_data['determinism']))
+       
         '''
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r) #cast to tensor
@@ -134,20 +135,29 @@ class NLLFunction(torch.autograd.Function):
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r) #cast to tensor
         if(r.shape != (mdp_data['states'],5)):
-
             #convert to full reward
             r = torch.matmul(F, r)
             r = r.repeat((1, 5))
+        
+        #'''
 
+        if r.shape != (int(mdp_data['states']),5):
+            raise Exception("Reward shape not (states, 5) instead it's", + str(r.shape))
 
         #Solve MDP with current reward
         v, q, logp, p = linearvalueiteration(mdp_data, r) 
    
+
+
+        
         #Calculate likelihood from logp
         likelihood = torch.empty(mu_sa.shape, requires_grad=True)
 
 
         likelihood = torch.sum(torch.sum(logp*mu_sa)) #for scalar likelihood
+
+
+
 
         #LH for each state as tensor size (states,1)
         #mul = logp*mu_sa #hold
@@ -157,6 +167,7 @@ class NLLFunction(torch.autograd.Function):
       
         return -likelihood
     
+
     @staticmethod
     def backward(ctx, grad_output):
         #print('Grad output {}'.format(grad_output))
@@ -174,14 +185,14 @@ class NLLFunction(torch.autograd.Function):
             'sa_p':sa_p
             }
 
-        """
+        '''
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r) #cast to tensor
         if(r.shape != (mdp_data['states'],5)):
             #reformat to be in shape (states,actions)
             r = torch.reshape(r, (int(mdp_data['states']),1))
             r = r.repeat((1, 5))
-        """
+        '''
 
         if(torch.is_tensor(r) == False):
             r = torch.tensor(r) #cast to tensor
@@ -189,7 +200,10 @@ class NLLFunction(torch.autograd.Function):
             #convert to full reward
             r = torch.matmul(F, r)
             r = r.repeat((1, 5))
+       # '''
 
+        if r.shape != (int(mdp_data['states']),5):
+            raise Exception("Reward shapenot (states, 5) instead it's", + str(r.shape))
 
         #Solve MDP with current reward
         v, q, logp, p = linearvalueiteration(mdp_data, r) 
@@ -199,8 +213,10 @@ class NLLFunction(torch.autograd.Function):
         D = linearmdpfrequency(mdp_data,p,initD)#Compute state visitation count D
         D = D.clone().detach().requires_grad_(True) #cast to tensor
         #D = torch.tensor(D.clone().detach().requires_grad_(True)) #Cast to tensor
+        
         dr = muE - torch.matmul(torch.t(F),D) #Compute gradient
         #print('gradient:\n',-dr)
+
         #dr = dr.repeat((1, 5)) #make shape [states, 5]
 
         #dr = dr.view(len(dr)) #Make row vector
@@ -210,6 +226,10 @@ class NLLFunction(torch.autograd.Function):
     def calculate_EVD(self, trueP, currR):
         if(currR.shape != (len(currR),5)):
             currR = currR.repeat((1, 5))
+
+        if currR.shape != trueP.shape:
+            raise Exception("Reward shapenot (states, 5) instead it's", + str(currR.shape))
+
         v, q, logp, currP = linearvalueiteration(self.mdp_data, currR)
         #Expected Value Diff = diff in policies since exact True R values never actually learned, only it's structure
         evd=torch.max(torch.abs(currP-trueP))

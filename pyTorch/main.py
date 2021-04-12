@@ -519,12 +519,9 @@ new_paths = True
 normalise = False
 
 if new_paths:
-    print('\n ... new paths will be sampled and dumped to NNIRL_param_list.pkl this run ...\n')
+    print('\n... new paths will be sampled and dumped to NNIRL_param_list.pkl this run ...\n')
 else:
-    print('\n ... loading paths and params from NNIRL_param_list.pkl ...\n')
-
-
-
+    print('\n... loading paths and params from NNIRL_param_list.pkl ...\n')
 
 # Generate mdp and R
 # Will always produce constant results due to constant random seed param

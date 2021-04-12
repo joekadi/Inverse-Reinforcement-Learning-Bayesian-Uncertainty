@@ -89,7 +89,7 @@ class LitModel(pl.LightningModule):
 if __name__ == "__main__":
 
     # Initalise task on clearML
-    task = Task.init(project_name='MSci-Project', task_name='Train - Regular')
+    #task = Task.init(project_name='MSci-Project', task_name='Train - Regular')
     
     # Load variables
     open_file = open("NNIRL_param_list.pkl", "rb")
@@ -123,6 +123,13 @@ if __name__ == "__main__":
     else:
         print('\n... training on GridWorld benchmark ... \n')
 
+    if len(sys.argv) > 1:
+        dropout_val = float(str(sys.argv[1]))
+        print('\n... got dropout value from cmd line ...\n')
+    else:
+        dropout_val = 0.2
+        print('\n... got dropout value from pre-defined variable ...\n')
+
     #Print true R loss 
     print('\n... true reward loss is', trueNLL.item() ,'... \n')
     
@@ -130,8 +137,8 @@ if __name__ == "__main__":
     NLL = NLLFunction()
    
     # Connect configuration dict
-    configuration_dict = {'number_of_epochs': 1, 'base_lr': 0.05, 'p': 0.02, 'no_hidden_layers': 3, 'no_neurons_in_hidden_layers': len(feature_data['splittable'][0])*2 } #set config params for clearml
-    configuration_dict = task.connect(configuration_dict)
+    configuration_dict = {'number_of_epochs': 3, 'base_lr': 0.05, 'p': dropout_val, 'no_hidden_layers': 3, 'no_neurons_in_hidden_layers': len(feature_data['splittable'][0])*2 } #set config params for clearml
+    #configuration_dict = task.connect(configuration_dict)
 
     # Assign loss function constants
     NLL.F = feature_data['splittable']
@@ -175,5 +182,5 @@ if __name__ == "__main__":
             pass
 
     # Save model and new features
-    torch.save(model.model, TRAINED_MODELS_PATH +str(len(example_samples))+'_REG_model.pth') 
+    torch.save(model.model, "./regular/models/"+str(worldtype)+'_'+str(dropout_val)+'_'+str(len(example_samples))+'_REG_model.pth') 
     tensorboard_writer.close()

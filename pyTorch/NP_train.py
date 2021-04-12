@@ -95,14 +95,21 @@ if __name__ == "__main__":
         index_states_to_remove = 0
         print('\n... got which noisey states from pre-defined variable ...\n')
 
-    if index_states_to_remove < 0 or index_states_to_remove > 2:
-        raise Exception("Index of states to remove from paths must be within range 0 - 2")
+    if len(sys.argv) > 2:
+        dropout_val = float(str(sys.argv[2]))
+        print('\n... got dropout value from cmd line ...\n')
+    else:
+        dropout_val = 0.2
+        print('\n... got dropout value from pre-defined variable ...\n')
 
-    states_to_remove = [np.arange(0, 32, 1), np.arange(0, 64, 1), np.arange(0, 128, 1)]
-    num_preds = 1000 # Number of samples
+    if index_states_to_remove < 0 or index_states_to_remove > 3:
+        raise Exception("Index of states to remove from paths must be within range 0 - 3")
+
+    states_to_remove = [np.arange(0, 32, 1), np.arange(0, 128, 1), np.arange(100, 200, 1), np.arange(200,255,1)]
+    num_preds = 5000 # Number of samples
 
     # Initalise task on clearML
-    task = Task.init(project_name='MSci-Project', task_name='Train - Noisey paths')
+  #task = Task.init(project_name='MSci-Project', task_name='Train - Noisey paths')
     
     # Load variables
     open_file = open("NNIRL_param_list.pkl", "rb")
@@ -145,20 +152,24 @@ if __name__ == "__main__":
     # Remove chosen state from paths
     print('\n... removing states from paths ...\n')
     N = len(example_samples)
-    for path in example_samples:
+    top_index = math.ceil(0.4*N)
+    print(top_index)
+    twenty_percent_example_samples = example_samples[0:top_index]
+    for path in twenty_percent_example_samples:
         T = len(path)
-        pathindex = example_samples.index(path)
+        pathindex = twenty_percent_example_samples.index(path)
         for move in path:
-            moveindex = example_samples[pathindex].index(move)
+            moveindex = twenty_percent_example_samples[pathindex].index(move)
             #remove state
             if move[0] in states_to_remove[index_states_to_remove]:
                 newmove = (random.randint(0, len(feature_data['splittable'][0]-1)), move[1])
-                example_samples[pathindex][moveindex] = newmove                
+                twenty_percent_example_samples[pathindex][moveindex] = newmove       
+    example_samples[0:top_index] = twenty_percent_example_samples  
     initD, mu_sa, muE, F, mdp_data = NLL.calc_var_values(mdp_data, N, T, example_samples, feature_data)  # calculate required variables
 
     # Connect configuration dict
-    configuration_dict = {'number_of_epochs': 1, 'base_lr': 0.05, 'p': 0.02, 'no_hidden_layers': 3, 'no_neurons_in_hidden_layers': len(feature_data['splittable'][0])*2 } #set config params for clearml
-    configuration_dict = task.connect(configuration_dict)
+    configuration_dict = {'number_of_epochs': 3, 'base_lr': 0.05, 'p': dropout_val, 'no_hidden_layers': 3, 'no_neurons_in_hidden_layers': len(feature_data['splittable'][0])*2 } #set config params for clearml
+    #configuration_dict = task.connect(configuration_dict)
 
     # Assign loss function constants
     NLL.F = feature_data['splittable']
@@ -203,6 +214,6 @@ if __name__ == "__main__":
             pass
 
     # Save model and new features
-    torch.save(model.model, TRAINED_MODELS_PATH + str(len(example_samples))+'_NP_model_'+str(index_states_to_remove)+'.pth') 
+    torch.save(model.model, TRAINED_MODELS_PATH+str(worldtype)+'_'+str(dropout_val)+'_'+ str(len(example_samples))+'_NP_model_'+str(index_states_to_remove)+'.pth') 
     tensorboard_writer.close()
     

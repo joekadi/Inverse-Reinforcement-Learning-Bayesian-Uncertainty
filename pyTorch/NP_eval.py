@@ -44,8 +44,24 @@ if __name__ == "__main__":
         index_states_to_remove = 0
         print('\n... got which noisey states from pre-defined variable ...\n')
 
-    if index_states_to_remove < 0 or index_states_to_remove > 2:
-        raise Exception("Index of states to remove from paths must be within range 0 - 2")
+    
+    if len(sys.argv) > 2:
+        dropout_val = float(str(sys.argv[2]))
+        print('\n... got dropout value from cmd line ...\n')
+    else:
+        dropout_val = 0.2
+        print('\n... got dropout value from pre-defined variable ...\n')
+
+    if len(sys.argv) > 3:
+        num_paths = int(str(sys.argv[3]))
+        print('\n... got number of paths value from cmd line ...\n')
+    else:
+        num_paths = 64
+        print('\n... got dropout value from pre-defined variable ...\n')
+    
+    if index_states_to_remove < 0 or index_states_to_remove > 3:
+        raise Exception("Index of states to remove from paths must be within range 0 - 3")
+
 
     # Load variables from main
     open_file = open("NNIRL_param_list.pkl", "rb")
@@ -60,7 +76,7 @@ if __name__ == "__main__":
     mdp_data = NNIRL_param_list[6]
     truep = NNIRL_param_list[7] 
     NLL_EVD_plots = NNIRL_param_list[8]
-    example_samples = NNIRL_param_list[9]
+    #example_samples = NNIRL_param_list[9]
     mdp_params = NNIRL_param_list[10] 
     r = NNIRL_param_list[11] 
     mdp_solution = NNIRL_param_list[12] 
@@ -80,14 +96,17 @@ if __name__ == "__main__":
         print('\n... evaluating on GridWorld benchmark ... \n')
 
     #Load model
-    irl_model = torch.load('./noisey_paths/models/' +str(len(example_samples))+ '_NP_model_'+str(index_states_to_remove)+'.pth') 
+    irl_model = torch.load('./noisey_paths/models/'+str(worldtype)+'_'+str(dropout_val)+'_'+str(num_paths)+ '_NP_model_'+str(index_states_to_remove)+'.pth') 
     
     num_preds = 1000 # Number of samples
+    start_time = time.time()
 
+    irl_model = irl_model.train()
     # Make predicitons w/ trained models
     print('\n... Making predictions w/ trained models ...\n')
     for i in range(len(feature_data['splittable'])):
         Yt_hat_relu = np.array([torch.matmul(feature_data['splittable'],irl_model(feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1)).data.cpu().numpy() for _ in range(num_preds)]).squeeze()
+    run_time = (time.time() - start_time)
     
     # Extract mean and std of predictions
     y_mc_relu = Yt_hat_relu.mean(axis=0)
@@ -110,11 +129,22 @@ if __name__ == "__main__":
     #Solve with learned reward functions
     y_mc_relu_v, y_mc_relu_q, y_mc_relu_logp, y_mc_relu_P = linearvalueiteration(mdp_data, y_mc_relu_reward)
 
+
     '''
     # Print results
     print("\nTrue R has:\n - negated likelihood: {}\n - EVD: {}".format(trueNLL,  irl_model.NLL.calculate_EVD(truep, r)))
     print("\nPred R with ReLU activation has:\n - negated likelihood: {}\n - EVD: {}".format(irl_model.NLL.apply(y_mc_relu_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), irl_model.NLL.calculate_EVD(truep, y_mc_relu_reward)))
     '''
+
+    # Initalise loss function
+    NLL = NLLFunction()
+    # Assign loss function constants
+    NLL.F = feature_data['splittable']
+    NLL.muE = muE
+    NLL.mu_sa = mu_sa
+    NLL.initD = initD
+    NLL.mdp_data = mdp_data
+
 
     #Save results
     print('\n... saving results ...\n')
@@ -127,8 +157,8 @@ if __name__ == "__main__":
         except FileExistsError:
             pass
 
-    NP_results = [y_mc_relu, y_mc_std_relu, y_mc_relu_reward, y_mc_relu_v, y_mc_relu_P, y_mc_relu_q]
-    file_name = RESULTS_PATH + str(len(example_samples))+ '_results_'+str(index_states_to_remove)+'.pkl'
+    NP_results = [y_mc_relu, y_mc_std_relu, y_mc_relu_reward, y_mc_relu_v, y_mc_relu_P, y_mc_relu_q, NLL.calculate_EVD(truep, y_mc_relu_reward), run_time, num_preds]
+    file_name = RESULTS_PATH+str(worldtype)+'_'+str(dropout_val)+'_'+ str(num_paths)+ '_results_'+str(index_states_to_remove)+'.pkl'
     open_file = open(file_name, "wb")
     pickle.dump(NP_results, open_file)
     open_file.close()

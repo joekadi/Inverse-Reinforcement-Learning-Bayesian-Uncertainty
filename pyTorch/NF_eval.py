@@ -44,6 +44,13 @@ if __name__ == "__main__":
         index_features_to_corrupt = 0
         print('\n... got which noisey features from pre-defined variable ...\n')
 
+    if len(sys.argv) > 2:
+        dropout_val = float(str(sys.argv[2]))
+        print('\n... got dropout value from cmd line ...\n')
+    else:
+        dropout_val = 0.2
+        print('\n... got dropout value from pre-defined variable ...\n')
+
     if index_features_to_corrupt < 0 or index_features_to_corrupt > 3:
         raise Exception("Index of features to corrupt must be within range 0 - 3")
 
@@ -80,20 +87,22 @@ if __name__ == "__main__":
         print('\n... evaluating on GridWorld benchmark ... \n')
 
     #Load model
-    irl_model = torch.load('./noisey_features/models/'+str(len(example_samples))+'_NF_model_'+str(index_features_to_corrupt)+'.pth') 
+    irl_model = torch.load('./noisey_features/models/'+str(worldtype)+'_'+str(dropout_val)+'_'+str(len(example_samples))+'_NF_model_'+str(index_features_to_corrupt)+'.pth') 
     
     #Load noisey feature data
-    open_file = open("./noisey_features/paths/"+str(len(example_samples))+"_feature_data_"+str(index_features_to_corrupt)+".pkl", "rb")
+    open_file = open("./noisey_features/featuredata/"+str(worldtype)+'_'+str(dropout_val)+'_'+str(len(example_samples))+"_feature_data_"+str(index_features_to_corrupt)+".pkl", "rb")
     feature_data = pickle.load(open_file)
     open_file.close()
 
-    num_preds = 1000 # Number of samples
+    num_preds = 5000 # Number of samples
 
+    start_time = time.time()
     # Make predicitons w/ trained models
     print('\n... Making predictions w/ trained models ...\n')
     for i in range(len(feature_data['splittable'])):
         Yt_hat_relu = np.array([torch.matmul(feature_data['splittable'],irl_model(feature_data['splittable'][i].view(-1)).reshape(len(feature_data['splittable'][0]),1)).data.cpu().numpy() for _ in range(num_preds)]).squeeze()
-    
+    run_time = (time.time() - start_time)
+
     # Extract mean and std of predictions
     y_mc_relu = Yt_hat_relu.mean(axis=0)
     y_mc_std_relu = Yt_hat_relu.std(axis=0)
@@ -121,6 +130,15 @@ if __name__ == "__main__":
     print("\nPred R with ReLU activation has:\n - negated likelihood: {}\n - EVD: {}".format(irl_model.NLL.apply(y_mc_relu_reward, initD, mu_sa, muE, feature_data['splittable'], mdp_data), irl_model.NLL.calculate_EVD(truep, y_mc_relu_reward)))
     '''
 
+    # Initalise loss function
+    NLL = NLLFunction()
+    # Assign loss function constants
+    NLL.F = feature_data['splittable']
+    NLL.muE = muE
+    NLL.mu_sa = mu_sa
+    NLL.initD = initD
+    NLL.mdp_data = mdp_data
+
     #Save results
     print('\n... saving results ...\n')
 
@@ -132,8 +150,8 @@ if __name__ == "__main__":
         except FileExistsError:
             pass
 
-    NP_results = [y_mc_relu, y_mc_std_relu, y_mc_relu_reward, y_mc_relu_v, y_mc_relu_P, y_mc_relu_q]
-    file_name = RESULTS_PATH+str(len(example_samples))+'_results_'+str(index_features_to_corrupt)+'.pkl'
+    NP_results = [y_mc_relu, y_mc_std_relu, y_mc_relu_reward, y_mc_relu_v, y_mc_relu_P, y_mc_relu_q, NLL.calculate_EVD(truep, y_mc_relu_reward), run_time, num_preds]
+    file_name = RESULTS_PATH+str(worldtype)+'_'+str(dropout_val)+'_'+str(len(example_samples))+'_results_'+str(index_features_to_corrupt)+'.pkl'
     open_file = open(file_name, "wb")
     pickle.dump(NP_results, open_file)
     open_file.close()
