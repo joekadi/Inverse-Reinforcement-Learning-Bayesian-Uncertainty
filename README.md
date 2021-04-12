@@ -16,6 +16,31 @@ To initialise benchmark (objectworld or gridworld):
 
 `$ python initialise_problem.py <worldtype> <number_of_paths>`
 
-This saves all variables required to construct benchmark problem in "./param_list/"*num paths*_NNIRL_param_list.pkl"
+This saves all variables required to construct benchmark problem in "./param_list/"
 
+All model training scripts in "./train_models/".
+
+To train and evaluate regular MC Dropout IRL model:
+
+`$ python mcd_train.py <dropout_p_value> <number_of_paths>`
+
+Trained model saved in TRAINED_MODELS_PATH
+
+`$ cd "./eval_models/"`
+
+`$ python mcd_eval.py <dropout_p_value> <number_of_paths>`
+
+Results saved in TRAINED_MODELS_PATH
+
+`$ python mcd_train.py <dropout_p_value> <number_of_paths>`
+
+
+
+`$ python mcd_train.py <dropout_p_value> <number_of_paths>`
+
+
+
+To train regular MC Dropout IRL model:
+
+`$ python mcd_train.py <dropout_p_value> <number_of_paths>`
 
