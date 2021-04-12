@@ -18,18 +18,49 @@ To initialise benchmark (objectworld or gridworld):
 
 This saves all variables required to construct benchmark problem in "./param_list/"
 
-All model training scripts in "./train_models/".
+# Regular IRL
 
-To train and evaluate model on regular IRL problem:
+To train a model:
+
+`cd ./train_models/regular/`
 
 `$ python <training_script_name>.py <dropout_p_value> <number_of_paths>`
 
-Trained model saved in TRAINED_MODELS_PATH
+Trained model saved in $TRAINED_MODELS_PATH$
+
+For ensembles, eval also carried out in this script and results saved to $RESULTS_PATH$
+
+To evaluate a trained model:
 
 `$ cd "./eval_models/"`
 
-`$ python <training_script_name>.py <dropout_p_value> <number_of_paths>`
+`$ python <eval_script_name>.py <dropout_p_value> <number_of_paths>`
 
-Results saved in TRAINED_MODELS_PATH
+Results saved in$ RESULTS_PATH$
+
+# Noisy IRL
+
+`cd ./train_models/$TYPE_OF_NOISE$/`
+
+index_of_noisy_states is 0 for states 1-32, 1 for states 1-64 and 2 for states 1-128
+
+`$ python <training_script_name>.py <index_of_noisy_states> <dropout_p_value> <number_of_paths>`
+
+Trained model saved in $TRAINED_MODELS_PATH$
+
+For ensembles, eval also carried out in this script and results saved to $RESULTS_PATH$
+
+To evaluate a trained model:
+
+`$ cd "./eval_models/$TYPE_OF_NOISE$"`
+
+`$ python <eval_script_name>.py <index_of_noisy_states> <dropout_p_value> <number_of_paths>`
+
+Results saved in $RESULTS_PATH$
+
+
+
+
+
 
 
