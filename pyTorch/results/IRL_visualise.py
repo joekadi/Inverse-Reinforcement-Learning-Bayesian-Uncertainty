@@ -11,10 +11,14 @@ from torch.utils.data import random_split
 import os
 from sklearn.preprocessing import MinMaxScaler
 import sys
-from NLLFunction import *
-from gridworld import *
-from objectworld import *
-from linearvalueiteration import *
+sys.path[0] = "/Users/joekadi/Documents/University/5thYear/Thesis/Code/MSci-Project/pyTorch/"
+from maxent_irl.obj_functions.NLLFunction import *
+from maxent_irl.obj_functions.NLLModel import *
+from benchmarks.gridworld import *
+from benchmarks.objectworld import *
+from maxent_irl.linearvalueiteration import *
+import pprint
+from maxent_irl.sampleexamples import *
 import pprint
 import numpy as np
 import pandas as pd
