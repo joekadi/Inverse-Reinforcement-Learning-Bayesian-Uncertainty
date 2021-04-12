@@ -20,27 +20,16 @@ This saves all variables required to construct benchmark problem in "./param_lis
 
 All model training scripts in "./train_models/".
 
-To train and evaluate regular MC Dropout IRL model:
+To train and evaluate model on regular IRL problem:
 
-`$ python mcd_train.py <dropout_p_value> <number_of_paths>`
+`$ python <training_script_name>.py <dropout_p_value> <number_of_paths>`
 
 Trained model saved in TRAINED_MODELS_PATH
 
 `$ cd "./eval_models/"`
 
-`$ python mcd_eval.py <dropout_p_value> <number_of_paths>`
+`$ python <training_script_name>.py <dropout_p_value> <number_of_paths>`
 
 Results saved in TRAINED_MODELS_PATH
 
-`$ python mcd_train.py <dropout_p_value> <number_of_paths>`
-
-
-
-`$ python mcd_train.py <dropout_p_value> <number_of_paths>`
-
-
-
-To train regular MC Dropout IRL model:
-
-`$ python mcd_train.py <dropout_p_value> <number_of_paths>`
 
