@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 import os
-from sklearn.preprocessing import MinMaxScaler
 
 torch.set_printoptions(precision=5, sci_mode=False, threshold=1000)
 torch.set_default_tensor_type(torch.DoubleTensor)
@@ -76,7 +75,6 @@ def ence(targets, preds, stds, n_bins=256):
     if curr_rmv != 0:
         return (abs(curr_rmv-curr_rmse)/curr_rmv)/n_bins*10000 #scale up for readability
     else:
-        #return abs(curr_rmv-curr_rmse)/len(preds)
         raise Exception('Root Mean Variance = 0')
 
 def plot_ence(targets, preds, stds, n_bins=256):
@@ -102,11 +100,11 @@ def plot_ence(targets, preds, stds, n_bins=256):
         rmvs.append(rmv(stds[int(math.ceil(bin_indexes[start_indx])):int(math.ceil(bin_indexes[stop_indx]))]))
         start_indx +=1
         stop_indx +=1
+        
     rmses = np.array(rmses)
     rmvs = np.array(rmvs)
     fig, ax = plt.subplots(1, figsize=(2,2))
-    rmvs = np.sort(rmvs, axis=None)
-    rmses = np.sort(rmses, axis=None)
+
     ax.plot(rmses, rmvs, label='Actual') #Line
     ax.plot([0,1], [0,1], 'k--', label='Goal', alpha=0.5)
     ax.axes.get_yaxis().set_visible(False)
@@ -157,26 +155,10 @@ def epdue(uncertainty, epd):
     :return: the computed epdue
     """
 
-    scaler = MinMaxScaler()
-    uncertainty = scaler.fit_transform(np.array(uncertainty))
-    epd = scaler.fit_transform(np.array(epd))
-
-    uncertainty = np.sort(uncertainty, axis=None)
-    epd = np.sort(epd, axis=None)
-    
-   
     return np.mean(np.abs(epd-uncertainty))  
 
 def plot_epdue(uncertainty, epd):
     fig, ax = plt.subplots(1, figsize=(3,3.5))
-    
-    uncertainty = np.sort(uncertainty, axis=None)
-    epd = np.sort(epd, axis=None)
-
-    
-    scaler = MinMaxScaler()
-    uncertainty = scaler.fit_transform(np.array(uncertainty).reshape(-1,1))
-    epd = scaler.fit_transform(np.array(epd).reshape(-1,1))
     
 
     ax.plot(uncertainty, epd, 'ro') #Dots
