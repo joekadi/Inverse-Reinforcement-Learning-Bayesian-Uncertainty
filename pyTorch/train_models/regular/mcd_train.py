@@ -68,7 +68,7 @@ class LitModel(pl.LightningModule):
             elif activation == 'tanh':
                 self.model.add_module('tanh'+str(i+1), nn.Tanh())
         self.model.add_module('dropout'+str(i+2), nn.Dropout(p=configuration_dict['p']))
-        self.model.add_module('final', nn.Linear(configuration_dict['no_neurons_in_hidden_layers'], 1))
+        self.model.add_module('final', nn.Linear(configuration_dict['no_neurons_in_hidden_layers'], no_features))
 
     def forward(self, x):
         return self.model(x)
