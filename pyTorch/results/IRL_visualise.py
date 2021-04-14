@@ -416,7 +416,7 @@ ax1.fill_between(paths, np.array(evd_vals[3])+np.array(swag_results['ow'][1024][
 ax1.plot(paths, evd_vals[4], alpha=0.8, label="GPIRL", color='purple')
 ax1.fill_between(paths, np.array(evd_vals[4])+np.array(gpirl_results['ow'][1024][0.0]['evd_variances']), np.array(evd_vals[4])-np.array(gpirl_results['ow'][1024][0.0]['evd_variances']), alpha=0.35, facecolor='purple')
 ax1.plot(paths, evd_vals[5], alpha=0.8, label="MaxEnt", color='brown')
-ax1.fill_between(paths, np.array(evd_vals[5])+np.array(maxent_results['ow'][1024][0.0]['evd_variances'])/2, np.array(evd_vals[5])-np.array(maxent_results['ow'][1024][0.0]['evd_variances'])/2, alpha=0.35, facecolor='brown')
+ax1.fill_between(paths, np.array(evd_vals[5])+np.array(maxent_results['ow'][1024][0.0]['evd_variances']), np.array(evd_vals[5])-np.array(maxent_results['ow'][1024][0.0]['evd_variances']), alpha=0.35, facecolor='brown')
 ax1.legend(fontsize='small')
 ax1.set_title('Expected Value Difference')
 ax1.set_xlabel('Number Of Paths')
