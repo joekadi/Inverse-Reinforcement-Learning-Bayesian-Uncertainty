@@ -170,7 +170,8 @@ if __name__ == "__main__":
     train_loader = torch.utils.data.DataLoader(feature_data['splittable'], num_workers = 8)
     
     # Define trainer
-    trainer = pl.Trainer(max_epochs=configuration_dict['number_of_epochs'])
+    #trainer = pl.Trainer(max_epochs=configuration_dict['number_of_epochs'])
+    trainer = pl.Trainer()
 
 
     # Define network
