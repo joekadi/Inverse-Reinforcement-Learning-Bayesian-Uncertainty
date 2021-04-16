@@ -234,7 +234,7 @@ if __name__ == "__main__":
     i = 0
     swa_n = 1
     #for epoch in range(configuration_dict['number_of_epochs']):
-    while diff >= threshold and i < 765:
+    while diff >= threshold:
         for batch in train_loader:
 
             prevLoss = loss
