@@ -307,14 +307,11 @@ gpirl_results = {
                 }
             }
 
-    #stds = scaler.fit_transform(np.array(stds))
-
 #Get lists of variants
 worlds = ['ow']
 paths = list(np_results['ow'].keys())
 dropout_vals = [0.0, 0.5, 1.0]
 variant_vals = list(np_results['ow'][paths[0]][dropout_vals[0]].keys())
-scaler = MinMaxScaler()
 #Populate NP results dict with results from files
 for world in worlds:
     for no_paths in paths:
@@ -739,8 +736,8 @@ np_dropout_avg_policy = sum(np_dropout_policies_per_paths)/len(np_dropout_polici
 np_ensembles_avg_policy = sum(np_ensembles_policies_per_paths)/len(np_ensembles_policies_per_paths)
 
 #Calc avg uncertainty
-np_dropout_avg_uncertainty = scaler.fit_transform(sum(np_dropout_uncertainties_per_paths)/len(np_dropout_uncertainties_per_paths))
-np_ensembles_avg_uncertainty = scaler.fit_transform(sum(np_ensembles_uncertainties_per_paths)/len(np_ensembles_uncertainties_per_paths))
+np_dropout_avg_uncertainty = sum(np_dropout_uncertainties_per_paths)/len(np_dropout_uncertainties_per_paths)
+np_ensembles_avg_uncertainty = sum(np_ensembles_uncertainties_per_paths)/len(np_ensembles_uncertainties_per_paths)
 
 
 #Calculate and store avg swag and gp uncertainties and policies
@@ -786,8 +783,8 @@ np_swag_avg_policy = sum(np_swag_policies_per_paths)/len(np_swag_policies_per_pa
 np_gp_avg_policy = sum(np_gp_policies_per_paths)/len(np_gp_policies_per_paths)
 
 #Calc avg uncertainty
-np_swag_avg_uncertainty = scaler.fit_transform(sum(np_swag_uncertainties_per_paths)/len(np_swag_uncertainties_per_paths))
-np_gp_avg_uncertainty = scaler.fit_transform(sum(np_gp_uncertainties_per_paths)/len(np_gp_uncertainties_per_paths))
+np_swag_avg_uncertainty = sum(np_swag_uncertainties_per_paths)/len(np_swag_uncertainties_per_paths)
+np_gp_avg_uncertainty = sum(np_gp_uncertainties_per_paths)/len(np_gp_uncertainties_per_paths)
 
 
 nf_dropout_uncertainties_per_paths = []
@@ -835,8 +832,8 @@ nf_dropout_avg_policy = sum(nf_dropout_policies_per_paths)/len(nf_dropout_polici
 nf_ensembles_avg_policy = sum(nf_ensembles_policies_per_paths)/len(nf_ensembles_policies_per_paths)
 
 #Calc avg uncertainty
-nf_dropout_avg_uncertainty = scaler.fit_transform(sum(nf_dropout_uncertainties_per_paths)/len(nf_dropout_uncertainties_per_paths))
-nf_ensembles_avg_uncertainty = scaler.fit_transform(sum(nf_ensembles_uncertainties_per_paths)/len(nf_ensembles_uncertainties_per_paths))
+nf_dropout_avg_uncertainty = sum(nf_dropout_uncertainties_per_paths)/len(nf_dropout_uncertainties_per_paths)
+nf_ensembles_avg_uncertainty = sum(nf_ensembles_uncertainties_per_paths)/len(nf_ensembles_uncertainties_per_paths)
 
 #Calculate and store avg swag uncertainties and policies
 nf_swag_uncertainties_per_paths = []
@@ -892,8 +889,8 @@ nf_swag_avg_policy = sum(nf_swag_policies_per_paths)/len(nf_swag_policies_per_pa
 nf_gp_avg_policy = sum(nf_gp_policies_per_paths)/len(nf_gp_policies_per_paths)
 
 #Calc avg uncertainty
-nf_swag_avg_uncertainty = scaler.fit_transform(sum(nf_swag_uncertainties_per_paths)/len(nf_swag_uncertainties_per_paths))
-nf_gp_avg_uncertainty = scaler.fit_transform(sum(nf_gp_uncertainties_per_paths)/len(nf_gp_uncertainties_per_paths))
+nf_swag_avg_uncertainty = sum(nf_swag_uncertainties_per_paths)/len(nf_swag_uncertainties_per_paths)
+nf_gp_avg_uncertainty = sum(nf_gp_uncertainties_per_paths)/len(nf_gp_uncertainties_per_paths)
 
 #Calc avg reward
 nf_swag_avg_reward = sum(nf_swag_rewards_per_paths)/len(nf_swag_rewards_per_paths)
@@ -975,11 +972,10 @@ total_gp_avg_policy = sum(total_gp_policies_per_paths)/len(total_gp_policies_per
 total_ensembles_avg_policy = sum(total_ensembles_policies_per_paths)/len(total_ensembles_policies_per_paths)
 total_dropout_avg_policy = sum(total_dropout_policies_per_paths)/len(total_dropout_policies_per_paths)
 #Calc total avg uncertainty
-total_swag_avg_uncertainty = scaler.fit_transform(sum(total_swag_uncertainties_per_paths)/len(total_swag_uncertainties_per_paths))
-total_gp_avg_uncertainty = scaler.fit_transform(sum(total_gp_uncertainties_per_paths)/len(total_gp_uncertainties_per_paths))
+total_swag_avg_uncertainty = sum(total_swag_uncertainties_per_paths)/len(total_swag_uncertainties_per_paths)
+total_gp_avg_uncertainty = sum(total_gp_uncertainties_per_paths)/len(total_gp_uncertainties_per_paths)
 total_ensembles_avg_uncertainty = sum(total_ensembles_uncertainties_per_paths)/len(total_ensembles_uncertainties_per_paths)
-total_ensembles_avg_uncertainty = scaler.fit_transform(total_ensembles_avg_uncertainty)
-total_dropout_avg_uncertainty = scaler.fit_transform(sum(total_dropout_uncertainties_per_paths)/len(total_dropout_uncertainties_per_paths))
+total_dropout_avg_uncertainty = sum(total_dropout_uncertainties_per_paths)/len(total_dropout_uncertainties_per_paths)
 
 
  
