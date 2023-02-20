@@ -1,7 +1,7 @@
 # Evaluating Uncertainty Estimation Methods For Deep Neural Network’s In Inverse Reinforcement Learning
 
 <p>
-This is framework was to enable my Computing Science Level 5 MSci Project @ Glasgow University where I compare the quality of uncertainty estimates from multiple Deep Neural Network uncertainty calibration techniques on the Inverse Reinforcement Learning problem. Namely: Monte-Carlo Dropout, Stochastic Weight Averaging Gaussian and Ensembles. The final paper can be viewed <a href="https://drive.google.com/drive/u/0/folders/16BMPBphnrpG4QrkZicH2WGt9Dd-TSa9C" target="_blank">here</a>. The thesis received a grade A. 
+This is framework was to enable my Computing Science Level 5 MSci Project @ Glasgow University where I compare the quality of uncertainty estimates from multiple Deep Neural Network uncertainty calibration techniques on the Inverse Reinforcement Learning problem. Namely: Monte-Carlo Dropout, Stochastic Weight Averaging Gaussian and Ensembles. The final paper can be viewed <a href="https://drive.google.com/file/d/1va5LNepVvTOyLwiSYZqsB9MGYxUasgoo/view?usp=share_link" target="_blank">here</a>. The thesis received a grade A. 
 </p>
 
 # Setup Instructions
